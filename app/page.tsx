@@ -1,6 +1,53 @@
 "use client";
 import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 const MastroERP = dynamic(() => import('@/components/MastroERP'), { ssr: false });
+
 export default function Page() {
-  return <MastroERP user={{id:"2a98547f-338b-4926-aa7b-0859cde5a1bf",email:"cozzafa@gmail.com"}} azienda={null} forceDesktop />;
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        setLoading(false);
+        return;
+      }
+      const { data } = await supabase.auth.signInWithPassword({
+        email: 'cozzafa@gmail.com',
+        password: 'Waltercozzasrl12@'
+      });
+      if (data?.user) setUser(data.user);
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0D1F1F', color: '#28A0A0', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>MASTRO DESKTOP</div>
+        <div style={{ fontSize: 12, opacity: 0.6 }}>Connessione...</div>
+      </div>
+    </div>
+  );
+
+  if (!user) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0D1F1F', color: '#DC4444', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>Errore login</div>
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 8 }}>Verifica credenziali</div>
+      </div>
+    </div>
+  );
+
+  return <MastroERP user={user} azienda={null} forceDesktop />;
 }
