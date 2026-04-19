@@ -25,7 +25,7 @@ export default function Page() {
       }
       const { data, error } = await supabase.auth.signInWithPassword({
         email: 'cozzafa@gmail.com',
-        password: 'Walter1375@'
+        password: 'Waltercozzasrl12@'
       });
       if (data?.user) { setUser(data.user); }
       else { setErr(error?.message || "Login fallito"); }
