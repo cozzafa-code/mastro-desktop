@@ -1,366 +1,224 @@
 "use client";
 // @ts-nocheck
 // ═══════════════════════════════════════════════════════════════
-// MASTRO HQ — Centro di Controllo Totale v2
-// fliwoX Design System · 3D Shadows · Real-time Context Data
-// Enterprise Control Room — costoso, preciso, vivo
+// MASTRO HQ — Enterprise Dashboard v3
+// Design: Linear meets Stripe — dense, precise, zero waste
+// Uses: mastro-design-system.ts
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useMastro } from "./MastroContext";
+import {
+  P, FONT, S, SHADOW, CARD, CARD_HOVER, BTN, BADGE,
+  SECTION_HEAD, ROW, ROW_HOVER_BG, AVATAR, DOT, progressBar,
+  fmtE, fmtK, pct, daysTo, TODAY,
+  FASI, FASE_LABEL, FASE_COLOR,
+} from "./mastro-design-system";
 
-// ── fliwoX DESIGN SYSTEM (IMMUTABILE) ─────────────────────────
-const DS = {
-  teal: '#28A0A0', tealDark: '#156060', tealHover: '#115E59',
-  dark: '#0D1F1F', ink: '#0D1F1F',
-  light: '#EEF8F8', bg: '#E8F4F4',
-  border: '#C8E4E4', white: '#FFFFFF',
-  red: '#DC4444', green: '#1A9E73', amber: '#F59E0B',
-  blue: '#3B7FE0', purple: '#8B5CF6', pink: '#EC4899',
-  orange: '#F97316',
-};
-const FM = "'JetBrains Mono','SF Mono','Fira Code',monospace";
-const FF = "'Inter',-apple-system,BlinkMacSystemFont,sans-serif";
+// ── Hover helpers ──────────────────────────────────────────────
+const hoverCard = (e) => { Object.assign(e.currentTarget.style, CARD_HOVER); };
+const leaveCard = (e) => { e.currentTarget.style.boxShadow = SHADOW.card; e.currentTarget.style.borderColor = P.border; };
+const hoverRow = (e) => { e.currentTarget.style.background = ROW_HOVER_BG; };
+const leaveRow = (e) => { e.currentTarget.style.background = 'transparent'; };
 
-// ── HELPERS ────────────────────────────────────────────────────
-const fmtE = (n) => "€" + Math.round(n).toLocaleString("it-IT");
-const fmtK = (n) => n >= 1000 ? "€" + Math.round(n / 1000) + "k" : fmtE(n);
-const pct = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
-const daysTo = (d) => Math.floor((new Date(d).getTime() - Date.now()) / 86400000);
-const TODAY = new Date().toISOString().split("T")[0];
-
-const FASI = ["sopralluogo","preventivo","conferma","misure","ordini","produzione","posa","chiusura"];
-const FASE_LABEL = { sopralluogo:"Sopralluogo", preventivo:"Preventivo", conferma:"Conferma", misure:"Misure", ordini:"Ordini", produzione:"Produzione", posa:"Posa", chiusura:"Chiusura" };
-const FASE_COLOR = { sopralluogo:DS.blue, preventivo:DS.amber, conferma:DS.teal, misure:DS.purple, ordini:DS.red, produzione:DS.orange, posa:DS.green, chiusura:"#6B7280" };
-
-// ── 3D CARD STYLE ──────────────────────────────────────────────
-const card3d = {
-  background: DS.white, borderRadius: 14, border: `1px solid ${DS.border}`,
-  boxShadow: `0 5px 0 ${DS.border}, 0 8px 16px rgba(0,0,0,0.07)`,
-  overflow: 'hidden', transition: 'box-shadow 0.2s, transform 0.2s',
-};
-const card3dHover = (e) => { e.currentTarget.style.boxShadow = `0 7px 0 ${DS.teal}, 0 10px 20px rgba(0,0,0,0.1)`; e.currentTarget.style.transform = 'translateY(-2px)'; };
-const card3dLeave = (e) => { e.currentTarget.style.boxShadow = `0 5px 0 ${DS.border}, 0 8px 16px rgba(0,0,0,0.07)`; e.currentTarget.style.transform = 'none'; };
-
-const btn3d = (bg, shadow) => ({
-  padding: '11px 20px', fontSize: 12, fontWeight: 700, color: DS.white, background: bg,
-  border: 'none', borderRadius: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-  fontFamily: FF, boxShadow: `0 4px 0 ${shadow}, 0 6px 10px rgba(0,0,0,0.12)`, transition: 'transform 0.08s',
-});
-const press = (e) => { e.currentTarget.style.transform = 'translateY(3px)'; };
-const release = (e) => { e.currentTarget.style.transform = 'none'; };
-
-// ── MICRO COMPONENTS ───────────────────────────────────────────
-function Dot({ color, size = 7 }) {
-  return <span style={{ width: size, height: size, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />;
+// ── Semaforo logic ─────────────────────────────────────────────
+function semaforo(ferme, attive, scadute, problemi) {
+  const r = attive > 0 ? ferme / attive : 0;
+  if (r > 0.25 || scadute > 3 || problemi > 5) return { c: P.red, l: "Criticità operativa" };
+  if (r > 0.1 || scadute > 0 || problemi > 0) return { c: P.amber, l: "Attenzione richiesta" };
+  return { c: P.green, l: "Operativo" };
 }
 
-function MiniBar({ value, max, color }) {
-  return (
-    <div style={{ height: 5, borderRadius: 3, background: DS.light, overflow: 'hidden', marginTop: 6 }}>
-      <div style={{ height: '100%', width: `${Math.min(pct(value, max), 100)}%`, background: color, borderRadius: 3, transition: 'width .4s ease' }} />
-    </div>
-  );
-}
-
-function WHead({ title, badge, badgeColor, dot, onAction, actionLabel }) {
-  return (
-    <div style={{ padding: '13px 18px', borderBottom: `1px solid ${DS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div style={{ fontWeight: 800, fontSize: 13, color: DS.dark, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {dot && <Dot color={dot} />}
-        {title}
-        {badge && <span style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, background: (badgeColor || DS.teal) + '15', color: badgeColor || DS.tealDark, fontWeight: 700 }}>{badge}</span>}
-      </div>
-      {onAction && <button onClick={onAction} style={{ fontSize: 10, color: DS.teal, fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none', fontFamily: FF }}>
-        {actionLabel || 'Vedi tutto →'}</button>}
-    </div>
-  );
-}
-
-function RowItem({ label, value, color, onClick, sub }) {
-  return (
-    <div onClick={onClick} style={{
-      padding: '10px 18px', borderBottom: `1px solid ${DS.border}`,
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      cursor: onClick ? 'pointer' : 'default', transition: 'background 0.1s', fontSize: 12, color: DS.dark,
-    }}
-      onMouseEnter={e => onClick && (e.currentTarget.style.background = DS.light)}
-      onMouseLeave={e => (e.currentTarget.style.background = DS.white)}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {color && <Dot color={color} size={6} />}
-        <div>
-          <span style={{ fontSize: 12, color: DS.dark }}>{label}</span>
-          {sub && <div style={{ fontSize: 9, color: DS.tealDark, marginTop: 1 }}>{sub}</div>}
-        </div>
-      </div>
-      <span style={{ fontWeight: 800, fontFamily: FM, fontSize: 16, color: color || DS.dark }}>{value}</span>
-    </div>
-  );
-}
-
-// ── SEMAFORO AZIENDA ───────────────────────────────────────────
-function semaforoAzienda(ferme, attive, fattScadute, problemi) {
-  const pFerme = attive > 0 ? (ferme / attive) * 100 : 0;
-  if (pFerme > 25 || fattScadute > 3 || problemi > 5) return { color: DS.red, label: "CRITICITÀ OPERATIVE", glow: `0 0 20px ${DS.red}60` };
-  if (pFerme > 10 || fattScadute > 0 || problemi > 0) return { color: DS.amber, label: "ATTENZIONE RICHIESTA", glow: `0 0 20px ${DS.amber}60` };
-  return { color: DS.green, label: "SOTTO CONTROLLO", glow: `0 0 20px ${DS.green}60` };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
 export default function DesktopDashboard() {
   const {
-    T, cantieri = [], fattureDB = [], ordiniFornDB = [], montaggiDB = [],
+    cantieri = [], fattureDB = [], ordiniFornDB = [], montaggiDB = [],
     tasks = [], msgs = [], team = [], problemi = [], aziendaInfo,
     setTab, setSelectedCM, setFilterFase, giorniFermaCM, sogliaDays = 7,
   } = useMastro();
 
-  const [showCriticita, setShowCriticita] = useState(true);
+  const [critOpen, setCritOpen] = useState(true);
+  const today = TODAY();
 
-  // ── COMPUTED DATA ──────────────────────────────────────────
   const D = useMemo(() => {
     const attive = cantieri.filter(c => c.fase !== "chiusura");
-    const ferme = attive.filter(c => giorniFermaCM(c) >= sogliaDays);
-    const confermati = attive.filter(c => ["conferma","misure","ordini","produzione","posa"].includes(c.fase));
-    const totPipeline = attive.reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
-    const totConfermato = confermati.reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
+    const ferme = attive.filter(c => giorniFermaCM(c) >= sogliaDays).sort((a, b) => giorniFermaCM(b) - giorniFermaCM(a));
+    const conf = attive.filter(c => ["conferma","misure","ordini","produzione","posa"].includes(c.fase));
+    const pipe = attive.reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
+    const pipeConf = conf.reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
 
-    const fattNonPagate = fattureDB.filter(f => !f.pagata);
-    const daIncassare = fattNonPagate.reduce((s, f) => s + (f.importo || 0), 0);
-    const fattScadute = fattureDB.filter(f => !f.pagata && f.scadenza && f.scadenza < TODAY);
-    const totScaduto = fattScadute.reduce((s, f) => s + (f.importo || 0), 0);
-    const fattTot = fattureDB.reduce((s, f) => s + (f.importo || 0), 0);
+    const fattScad = fattureDB.filter(f => !f.pagata && f.scadenza && f.scadenza < today);
+    const daInc = fattureDB.filter(f => !f.pagata).reduce((s, f) => s + (f.importo || 0), 0);
+    const totScad = fattScad.reduce((s, f) => s + (f.importo || 0), 0);
 
-    const problemiAperti = (problemi || []).filter(p => p.stato !== "risolto");
-    const montaggiOggi = montaggiDB.filter(m => m.data === TODAY);
-    const taskOggi = tasks.filter(t => !t.done && t.date === TODAY);
-    const msgNonLetti = msgs.filter(m => !m.letto).length;
+    const probAp = (problemi || []).filter(p => p.stato !== "risolto");
+    const montOggi = montaggiDB.filter(m => m.data === today);
+    const taskOggi = tasks.filter(t => !t.done && t.date === today);
+    const msgNL = msgs.filter(m => !m.letto).length;
 
-    const inProduzione = attive.filter(c => c.fase === "produzione");
+    const inProd = attive.filter(c => c.fase === "produzione");
+    const inOrd = attive.filter(c => c.fase === "ordini");
     const inPosa = attive.filter(c => c.fase === "posa");
-    const inOrdini = attive.filter(c => c.fase === "ordini");
-
-    // Criticità auto-generate
-    const criticita = [];
-    ferme.sort((a, b) => giorniFermaCM(b) - giorniFermaCM(a)).slice(0, 5).forEach(c => {
-      const gg = giorniFermaCM(c);
-      criticita.push({
-        id: `f-${c.id}`, gravita: gg >= 30 ? "alta" : "media",
-        titolo: `${c.cliente} ${c.cognome || ""} — ferma ${gg}gg`,
-        dettaglio: `${FASE_LABEL[c.fase] || c.fase} · ${c.code}`,
-        impatto: c.euro ? fmtK(parseFloat(c.euro)) : "—",
-        color: gg >= 30 ? DS.red : DS.amber,
-        onClick: () => { setSelectedCM(c); setTab("commesse"); },
-      });
-    });
-    fattScadute.slice(0, 3).forEach(f => {
-      criticita.push({
-        id: `ft-${f.id}`, gravita: "alta",
-        titolo: `Fattura scaduta — ${f.cliente || f.numero || "—"}`,
-        dettaglio: `Scaduta da ${Math.abs(daysTo(f.scadenza))}gg`,
-        impatto: fmtE(f.importo || 0), color: DS.red,
-        onClick: () => setTab("contabilita"),
-      });
-    });
-    problemiAperti.slice(0, 3).forEach(p => {
-      criticita.push({
-        id: `p-${p.id}`, gravita: p.priorita === "alta" ? "alta" : "media",
-        titolo: p.titolo || "Problema aperto",
-        dettaglio: `${p.tipo || ""}${p.commessa ? ` · ${p.commessa}` : ""}`,
-        impatto: "Da risolvere", color: p.priorita === "alta" ? DS.red : DS.amber,
-      });
-    });
+    const ordForn = (ordiniFornDB || []).filter(o => o.stato === "inviato");
 
     const LIMIT7 = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-    const consegne7 = cantieri.filter(c => c.dataConsegna && c.dataConsegna >= TODAY && c.dataConsegna <= LIMIT7 && c.fase !== "chiusura");
-    const montaggi7 = montaggiDB.filter(m => m.data >= TODAY && m.data <= LIMIT7);
-    const ordFornAttivi = (ordiniFornDB || []).filter(o => o.stato === "inviato");
+    const mont7 = montaggiDB.filter(m => m.data >= today && m.data <= LIMIT7);
+    const cons7 = cantieri.filter(c => c.dataConsegna && c.dataConsegna >= today && c.dataConsegna <= LIMIT7 && c.fase !== "chiusura");
 
-    const pratiche = { p50: cantieri.filter(c => c.detrazione === "50"), p65: cantieri.filter(c => c.detrazione === "65"), p75: cantieri.filter(c => c.detrazione === "75") };
+    // Criticità
+    const crit = [];
+    ferme.slice(0, 5).forEach(c => {
+      const gg = giorniFermaCM(c);
+      crit.push({ id: `f${c.id}`, t: `${c.cliente} ${c.cognome||""} — ferma ${gg}gg`, d: `${FASE_LABEL[c.fase]||c.fase} · ${c.code}`, imp: c.euro ? fmtK(parseFloat(c.euro)) : "—", col: gg>=30?P.red:P.amber, fn: () => { setSelectedCM(c); setTab("commesse"); } });
+    });
+    fattScad.slice(0, 3).forEach(f => {
+      crit.push({ id: `s${f.id}`, t: `Fattura scaduta — ${f.cliente||f.numero||"—"}`, d: `Da ${Math.abs(daysTo(f.scadenza))}gg`, imp: fmtE(f.importo||0), col: P.red, fn: () => setTab("contabilita") });
+    });
+    probAp.slice(0, 2).forEach(p => {
+      crit.push({ id: `p${p.id}`, t: p.titolo||"Problema", d: `${p.tipo||""}${p.commessa?` · ${p.commessa}`:""}`, imp: "—", col: p.priorita==="alta"?P.red:P.amber });
+    });
 
-    return {
-      attive, ferme, confermati, totPipeline, totConfermato,
-      daIncassare, fattScadute, totScaduto, fattNonPagate, fattTot,
-      problemiAperti, montaggiOggi, taskOggi, msgNonLetti,
-      inProduzione, inPosa, inOrdini, criticita,
-      consegne7, montaggi7, ordFornAttivi, pratiche,
-    };
+    const prat = { p50: cantieri.filter(c=>c.detrazione==="50"), p65: cantieri.filter(c=>c.detrazione==="65"), p75: cantieri.filter(c=>c.detrazione==="75") };
+
+    return { attive, ferme, conf, pipe, pipeConf, fattScad, daInc, totScad, probAp, montOggi, taskOggi, msgNL, inProd, inOrd, inPosa, ordForn, mont7, cons7, crit, prat };
   }, [cantieri, fattureDB, ordiniFornDB, montaggiDB, tasks, msgs, team, problemi, sogliaDays]);
 
-  const semaforo = semaforoAzienda(D.ferme.length, D.attive.length, D.fattScadute.length, D.problemiAperti.length);
-  const NOW = new Date();
-  const h = NOW.getHours();
-  const saluto = h < 12 ? "Buongiorno" : h < 18 ? "Buon pomeriggio" : "Buonasera";
-  const nomeAzienda = aziendaInfo?.ragione || aziendaInfo?.nome || "Walter Cozza Serramenti";
+  const sem = semaforo(D.ferme.length, D.attive.length, D.fattScad.length, D.probAp.length);
+  const now = new Date();
+  const sal = now.getHours() < 12 ? "Buongiorno" : now.getHours() < 18 ? "Buon pomeriggio" : "Buonasera";
+  const nome = aziendaInfo?.ragione || aziendaInfo?.nome || "Walter Cozza Serramenti";
+  const dateStr = now.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div style={{ height: "100%", overflowY: "auto", background: DS.bg, fontFamily: FF }}>
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px 40px" }}>
+    <div style={{ height: "100%", overflowY: "auto", background: P.bg, fontFamily: FONT.sans }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');`}</style>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 28px 48px" }}>
 
-        {/* ═══ HERO TOPBAR ══════════════════════════════════════ */}
-        <div style={{
-          background: DS.dark, borderRadius: '0 0 18px 18px', padding: '20px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20,
-          marginBottom: 18,
-          boxShadow: `0 6px 0 ${DS.tealDark}, 0 10px 30px rgba(0,0,0,0.2)`,
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: semaforo.color, boxShadow: semaforo.glow }} />
-              <span style={{ fontSize: 10, fontWeight: 800, color: semaforo.color, textTransform: 'uppercase', letterSpacing: 1.5 }}>{semaforo.label}</span>
-              <span style={{ fontSize: 10, color: '#ffffff40', marginLeft: 10 }}>{NOW.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+        {/* ═══ PAGE HEADER ═══ */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <div style={{ ...DOT(sem.c, 10) }} />
+              <span style={{ fontSize: S.xs, fontWeight: 700, color: sem.c, textTransform: "uppercase", letterSpacing: 1 }}>{sem.l}</span>
             </div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: DS.white, letterSpacing: -0.5 }}>
-              {saluto}, {nomeAzienda}
-            </h1>
-            <div style={{ fontSize: 12, color: '#ffffff70', marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span>{D.attive.length} commesse attive</span>
-              <span style={{ color: '#ffffff30' }}>·</span>
-              <span>{D.montaggiOggi.length} montaggi oggi</span>
-              <span style={{ color: '#ffffff30' }}>·</span>
-              {D.ferme.length > 0
-                ? <span style={{ color: DS.red, fontWeight: 700 }}>{D.ferme.length} ferme</span>
-                : <span style={{ color: DS.green }}>nessuna ferma</span>}
-              {D.fattScadute.length > 0 && <>
-                <span style={{ color: '#ffffff30' }}>·</span>
-                <span style={{ color: DS.amber, fontWeight: 700 }}>{fmtK(D.totScaduto)} scaduti</span>
-              </>}
-            </div>
+            <h1 style={{ fontSize: S.h1, fontWeight: 800, color: P.ink, margin: 0, letterSpacing: -0.5 }}>{sal}, {nome}</h1>
+            <p style={{ fontSize: S.md, color: P.hint, margin: "4px 0 0" }}>{dateStr}</p>
           </div>
-
-          {/* Quick action buttons */}
-          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-            <button style={btn3d(DS.teal, DS.tealDark)} onMouseDown={press} onMouseUp={release} onClick={() => setTab("commesse")}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 2v10M2 7h10" /></svg>
-              Commessa
-            </button>
-            <button style={btn3d(DS.blue, '#2563EB')} onMouseDown={press} onMouseUp={release} onClick={() => setTab("calendario")}>
-              Agenda
-            </button>
-            <button style={btn3d(D.criticita.length > 0 ? DS.red : DS.green, D.criticita.length > 0 ? '#B91C1C' : DS.tealDark)} onMouseDown={press} onMouseUp={release} onClick={() => setShowCriticita(v => !v)}>
-              {D.criticita.length} Criticità
-            </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: S.sm, color: P.hint, marginRight: 8 }}>
+              {D.attive.length} attive · {D.montOggi.length} montaggi oggi
+              {D.ferme.length > 0 && <span style={{ color: P.red, fontWeight: 700 }}> · {D.ferme.length} ferme</span>}
+            </span>
+            <button style={BTN.primary} onClick={() => setTab("commesse")}>+ Commessa</button>
+            <button style={BTN.secondary} onClick={() => setTab("calendario")}>Agenda</button>
           </div>
         </div>
 
-        {/* ═══ ALERT STRIP ══════════════════════════════════════ */}
-        {(D.ferme.length > 0 || D.fattScadute.length > 0 || D.problemiAperti.length > 0) && (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        {/* ═══ ALERT STRIP ═══ */}
+        {(D.fattScad.length > 0 || D.ferme.length > 0) && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {D.fattScad.length > 0 && (
+              <div onClick={() => setTab("contabilita")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: S.r8, background: P.redL, border: `1px solid ${P.red}20`, cursor: "pointer" }}>
+                <div style={DOT(P.red, 6)} />
+                <span style={{ fontSize: S.sm, fontWeight: 700, color: P.red }}>{D.fattScad.length} fatture scadute · {fmtK(D.totScad)}</span>
+              </div>
+            )}
             {D.ferme.length > 0 && (
-              <div onClick={() => setTab("commesse")} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10,
-                background: DS.white, border: `1.5px solid ${DS.red}40`, cursor: 'pointer',
-                boxShadow: `0 3px 0 ${DS.border}, 0 4px 8px rgba(0,0,0,0.05)`,
-              }}>
-                <Dot color={DS.red} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: DS.red }}>{D.ferme.length} commesse ferme · {pct(D.ferme.length, D.attive.length)}% — sblocca subito</span>
+              <div onClick={() => setTab("commesse")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: S.r8, background: P.amberL, border: `1px solid ${P.amber}20`, cursor: "pointer" }}>
+                <div style={DOT(P.amber, 6)} />
+                <span style={{ fontSize: S.sm, fontWeight: 700, color: P.amber }}>{D.ferme.length} commesse ferme · {pct(D.ferme.length, D.attive.length)}%</span>
               </div>
             )}
-            {D.fattScadute.length > 0 && (
-              <div onClick={() => setTab("contabilita")} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10,
-                background: DS.white, border: `1.5px solid ${DS.amber}40`, cursor: 'pointer',
-                boxShadow: `0 3px 0 ${DS.border}, 0 4px 8px rgba(0,0,0,0.05)`,
-              }}>
-                <Dot color={DS.amber} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: DS.amber }}>{D.fattScadute.length} fatture scadute · {fmtK(D.totScaduto)}</span>
-              </div>
-            )}
-            {D.problemiAperti.length > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 10,
-                background: DS.white, border: `1.5px solid ${DS.red}40`,
-                boxShadow: `0 3px 0 ${DS.border}, 0 4px 8px rgba(0,0,0,0.05)`,
-              }}>
-                <Dot color={DS.red} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: DS.red }}>{D.problemiAperti.length} problemi aperti</span>
+            {D.probAp.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: S.r8, background: P.redL, border: `1px solid ${P.red}20` }}>
+                <div style={DOT(P.red, 6)} />
+                <span style={{ fontSize: S.sm, fontWeight: 700, color: P.red }}>{D.probAp.length} problemi</span>
               </div>
             )}
           </div>
         )}
 
-        {/* ═══ KPI ROW ══════════════════════════════════════════ */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 18 }}>
+        {/* ═══ KPI ROW ═══ */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 20 }}>
           {[
-            { l: "Commesse attive", v: D.attive.length, sub: `${D.confermati.length} confermate`, c: DS.blue, pV: D.confermati.length, pO: D.attive.length, click: () => setTab("commesse") },
-            { l: "Ferme", v: D.ferme.length, sub: `soglia ${sogliaDays}gg`, c: D.ferme.length > 0 ? DS.red : DS.green, alert: D.ferme.length > 0, click: () => setTab("commesse") },
-            { l: "Pipeline", v: fmtK(D.totPipeline), sub: `${fmtK(D.totConfermato)} confermato`, c: DS.green, pV: D.totConfermato, pO: D.totPipeline },
-            { l: "Da incassare", v: fmtK(D.daIncassare), sub: `${D.fattScadute.length} scadute`, c: D.daIncassare > 0 ? DS.amber : DS.green, alert: D.fattScadute.length > 0, click: () => setTab("contabilita") },
-            { l: "Messaggi", v: D.msgNonLetti, sub: `${msgs.length} totali`, c: D.msgNonLetti > 0 ? DS.blue : DS.teal, click: () => setTab("messaggi") },
-            { l: "Oggi", v: D.montaggiOggi.length + D.taskOggi.length, sub: `${D.montaggiOggi.length} montaggi · ${D.taskOggi.length} task`, c: DS.purple, click: () => setTab("calendario") },
-          ].map(k => (
-            <div key={k.l} onClick={k.click} style={{
-              ...card3d, padding: '16px 18px', cursor: k.click ? 'pointer' : 'default',
-              borderColor: k.alert ? k.c + '40' : DS.border,
-            }}
-              onMouseEnter={k.click ? card3dHover : undefined}
-              onMouseLeave={k.click ? card3dLeave : undefined}>
-              <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: DS.tealDark, marginBottom: 6 }}>{k.l}</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: k.c, fontFamily: FM, lineHeight: 1 }}>{k.v}</div>
-              <div style={{ fontSize: 9, color: DS.tealDark, marginTop: 4 }}>{k.sub}</div>
-              {k.pO !== undefined && <MiniBar value={k.pV} max={Math.max(k.pO, 1)} color={k.c} />}
-              {k.pO !== undefined && <div style={{ fontSize: 8, color: DS.tealDark, marginTop: 3 }}>{pct(k.pV, k.pO)}% confermato</div>}
-            </div>
-          ))}
+            { l: "Commesse attive", v: D.attive.length, s: `${D.conf.length} confermate`, c: P.blue, pV: D.conf.length, pO: D.attive.length, fn: () => setTab("commesse") },
+            { l: "Ferme", v: D.ferme.length, s: `soglia ${sogliaDays}gg`, c: D.ferme.length>0?P.red:P.green, fn: () => setTab("commesse") },
+            { l: "Pipeline", v: fmtK(D.pipe), s: `${fmtK(D.pipeConf)} confermato`, c: P.green, pV: D.pipeConf, pO: D.pipe },
+            { l: "Da incassare", v: fmtK(D.daInc), s: `${D.fattScad.length} scadute`, c: D.fattScad.length>0?P.amber:P.green, fn: () => setTab("contabilita") },
+            { l: "Messaggi", v: D.msgNL, s: `${msgs.length} totali`, c: D.msgNL>0?P.blue:P.teal, fn: () => setTab("messaggi") },
+            { l: "Oggi", v: D.montOggi.length+D.taskOggi.length, s: `${D.montOggi.length} mont · ${D.taskOggi.length} task`, c: P.purple, fn: () => setTab("calendario") },
+          ].map(k => {
+            const pb = k.pO !== undefined ? progressBar(k.pV, k.pO, k.c) : null;
+            return (
+              <div key={k.l} onClick={k.fn} style={{ ...CARD, padding: "18px 20px", cursor: k.fn ? "pointer" : "default" }}
+                onMouseEnter={k.fn ? hoverCard : undefined} onMouseLeave={k.fn ? leaveCard : undefined}>
+                <div style={{ fontSize: S.xs, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: P.hint, marginBottom: 8 }}>{k.l}</div>
+                <div style={{ fontSize: S.hero, fontWeight: 900, color: k.c, fontFamily: FONT.mono, lineHeight: 1 }}>{k.v}</div>
+                <div style={{ fontSize: S.xs, color: P.hint, marginTop: 6 }}>{k.s}</div>
+                {pb && <><div style={pb.container}><div style={pb.fill} /></div><div style={{ fontSize: 9, color: P.hint, marginTop: 3 }}>{pct(k.pV, k.pO)}%</div></>}
+              </div>
+            );
+          })}
         </div>
 
-        {/* ═══ CRITICITÀ ════════════════════════════════════════ */}
-        {D.criticita.length > 0 && showCriticita && (
-          <div style={{ ...card3d, marginBottom: 18, borderColor: DS.red + '30' }}>
-            <WHead title="Criticità prioritarie" badge={`${D.criticita.length}`} badgeColor={DS.red} dot={DS.red} />
-            {D.criticita.map(cr => (
-              <div key={cr.id} onClick={cr.onClick} style={{
-                display: 'flex', alignItems: 'center', gap: 14, padding: '11px 18px',
-                borderBottom: `1px solid ${DS.border}`, cursor: cr.onClick ? 'pointer' : 'default',
-                transition: 'background 0.1s',
-              }}
-                onMouseEnter={e => cr.onClick && (e.currentTarget.style.background = DS.light)}
-                onMouseLeave={e => (e.currentTarget.style.background = DS.white)}>
-                <div style={{ width: 5, height: 32, borderRadius: 3, background: cr.color, flexShrink: 0 }} />
+        {/* ═══ CRITICITÀ ═══ */}
+        {D.crit.length > 0 && critOpen && (
+          <div style={{ ...CARD, marginBottom: 20, borderColor: P.red + '25' }}>
+            <div style={{ ...SECTION_HEAD }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={DOT(P.red)} />
+                <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Criticità prioritarie</span>
+                <span style={BADGE(P.red, P.redL)}>{D.crit.length}</span>
+              </div>
+              <button onClick={() => setCritOpen(false)} style={BTN.ghost}>Nascondi</button>
+            </div>
+            {D.crit.map(cr => (
+              <div key={cr.id} onClick={cr.fn} style={{ ...ROW, gap: 14 }}
+                onMouseEnter={cr.fn ? hoverRow : undefined} onMouseLeave={cr.fn ? leaveRow : undefined}>
+                <div style={{ width: 3, height: 28, borderRadius: 2, background: cr.col, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: DS.dark }}>{cr.titolo}</div>
-                  <div style={{ fontSize: 10, color: DS.tealDark, marginTop: 2 }}>{cr.dettaglio}</div>
+                  <div style={{ fontSize: S.md, fontWeight: 700, color: P.ink }}>{cr.t}</div>
+                  <div style={{ fontSize: S.sm, color: P.hint, marginTop: 2 }}>{cr.d}</div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: cr.color, fontFamily: FM }}>{cr.impatto}</div>
-                </div>
-                {cr.onClick && <span style={{ fontSize: 9, padding: '4px 10px', borderRadius: 6, border: `1px solid ${DS.border}`, color: DS.teal, fontWeight: 700, flexShrink: 0 }}>Apri →</span>}
+                <span style={{ fontSize: S.lg, fontWeight: 800, color: cr.col, fontFamily: FONT.mono }}>{cr.imp}</span>
+                {cr.fn && <span style={{ fontSize: S.xs, color: P.teal, fontWeight: 700, padding: "4px 10px", borderRadius: S.r6, border: `1px solid ${P.border}`, cursor: "pointer" }}>Apri →</span>}
               </div>
             ))}
           </div>
         )}
 
-        {/* ═══ MAIN GRID ═══════════════════════════════════════ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
+        {/* ═══ MAIN GRID ═══ */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
 
-          {/* ── COL 1 ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* COL 1 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
             {/* Pipeline */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Pipeline commesse" badge={`${D.attive.length} attive`} dot={DS.blue} onAction={() => setTab("commesse")} />
-              <div style={{ padding: '14px 18px' }}>
-                <div style={{ height: 8, borderRadius: 4, background: DS.light, display: 'flex', overflow: 'hidden', marginBottom: 12 }}>
-                  {FASI.map(fase => {
-                    const n = cantieri.filter(c => c.fase === fase).length;
-                    if (!n) return null;
-                    return <div key={fase} style={{ flex: n, background: FASE_COLOR[fase], minWidth: 4 }} title={`${FASE_LABEL[fase]}: ${n}`} />;
-                  })}
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.blue)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Pipeline</span>
+                  <span style={BADGE(P.blue, P.blueL)}>{D.attive.length}</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                  {FASI.filter(f => f !== "chiusura").map(fase => {
-                    const items = cantieri.filter(c => c.fase === fase);
-                    const euro = items.reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
-                    const col = FASE_COLOR[fase];
+                <button onClick={() => setTab("commesse")} style={BTN.ghost}>Tutte →</button>
+              </div>
+              <div style={{ padding: "16px 20px 12px" }}>
+                <div style={{ display: "flex", gap: 2, height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
+                  {FASI.map(f => { const n = cantieri.filter(c => c.fase === f).length; return n ? <div key={f} style={{ flex: n, background: FASE_COLOR[f], minWidth: 3, transition: "flex .4s" }} title={`${FASE_LABEL[f]}: ${n}`} /> : null; })}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                  {FASI.filter(f => f !== "chiusura").map(f => {
+                    const n = cantieri.filter(c => c.fase === f).length;
+                    const e = cantieri.filter(c => c.fase === f).reduce((s, c) => s + (parseFloat(c.euro) || 0), 0);
                     return (
-                      <div key={fase} onClick={() => { setFilterFase(fase); setTab("commesse"); }}
-                        style={{ padding: '10px 12px', borderRadius: 10, background: DS.light, border: `1px solid ${DS.border}`, cursor: 'pointer', transition: 'all 0.12s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = col; e.currentTarget.style.background = DS.white; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.background = DS.light; }}>
-                        <div style={{ fontSize: 9, color: DS.tealDark, fontWeight: 600 }}>{FASE_LABEL[fase]}</div>
-                        <div style={{ fontSize: 22, fontWeight: 800, fontFamily: FM, color: items.length > 0 ? col : DS.tealDark, lineHeight: 1, marginTop: 2 }}>{items.length}</div>
-                        <div style={{ fontSize: 8, fontWeight: 700, color: col, marginTop: 3 }}>{pct(items.length, cantieri.length)}%</div>
-                        {euro > 0 && <div style={{ fontSize: 8, color: DS.tealDark, marginTop: 1 }}>{fmtK(euro)}</div>}
+                      <div key={f} onClick={() => { setFilterFase(f); setTab("commesse"); }}
+                        style={{ padding: "10px 12px", borderRadius: S.r10, background: P.raised, border: `1px solid ${P.borderL}`, cursor: "pointer", transition: "all 0.15s" }}
+                        onMouseEnter={e2 => { e2.currentTarget.style.borderColor = FASE_COLOR[f]; e2.currentTarget.style.background = P.surface; }}
+                        onMouseLeave={e2 => { e2.currentTarget.style.borderColor = P.borderL; e2.currentTarget.style.background = P.raised; }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: P.hint, textTransform: "uppercase" }}>{FASE_LABEL[f]}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, fontFamily: FONT.mono, color: n > 0 ? FASE_COLOR[f] : P.ghost, lineHeight: 1, marginTop: 3 }}>{n}</div>
+                        {e > 0 && <div style={{ fontSize: 9, color: P.hint, marginTop: 3 }}>{fmtK(e)}</div>}
                       </div>
                     );
                   })}
@@ -368,94 +226,128 @@ export default function DesktopDashboard() {
               </div>
             </div>
 
-            {/* Controllo Economico */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Controllo economico" dot={DS.green} onAction={() => setTab("contabilita")} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+            {/* Economia */}
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.green)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Controllo economico</span>
+                </div>
+                <button onClick={() => setTab("contabilita")} style={BTN.ghost}>Dettagli →</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                 {[
-                  { l: "Pipeline", v: fmtK(D.totPipeline), c: DS.dark },
-                  { l: "Confermato", v: fmtK(D.totConfermato), c: DS.teal },
-                  { l: "Da incassare", v: fmtK(D.daIncassare), c: DS.amber },
-                  { l: "Scaduto", v: fmtK(D.totScaduto), c: D.totScaduto > 0 ? DS.red : DS.green },
+                  { l: "Pipeline", v: fmtK(D.pipe), c: P.ink },
+                  { l: "Confermato", v: fmtK(D.pipeConf), c: P.teal },
+                  { l: "Da incassare", v: fmtK(D.daInc), c: P.amber },
+                  { l: "Scaduto", v: fmtK(D.totScad), c: D.totScad > 0 ? P.red : P.green },
                 ].map((k, i) => (
-                  <div key={k.l} style={{ padding: '14px 18px', borderBottom: i < 2 ? `1px solid ${DS.border}` : 'none', borderRight: i % 2 === 0 ? `1px solid ${DS.border}` : 'none' }}>
-                    <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: DS.tealDark, marginBottom: 4 }}>{k.l}</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: k.c, fontFamily: FM, lineHeight: 1 }}>{k.v}</div>
+                  <div key={k.l} style={{ padding: "16px 20px", borderBottom: i < 2 ? `1px solid ${P.borderL}` : "none", borderRight: i % 2 === 0 ? `1px solid ${P.borderL}` : "none" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: P.hint, marginBottom: 6 }}>{k.l}</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: k.c, fontFamily: FONT.mono, lineHeight: 1 }}>{k.v}</div>
                   </div>
                 ))}
               </div>
-              {D.fattScadute.length > 0 && D.fattScadute.slice(0, 3).map(f => (
-                <div key={f.id} onClick={() => setTab("contabilita")} style={{
-                  display: 'flex', justifyContent: 'space-between', padding: '8px 18px',
-                  borderTop: `1px solid ${DS.border}`, cursor: 'pointer', fontSize: 12, transition: 'background 0.1s',
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.background = DS.light)}
-                  onMouseLeave={e => (e.currentTarget.style.background = DS.white)}>
-                  <span style={{ color: DS.dark, fontWeight: 600 }}>{f.cliente || f.numero || "—"}</span>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <span style={{ fontWeight: 800, color: DS.amber, fontFamily: FM }}>{fmtK(f.importo || 0)}</span>
-                    <span style={{ fontWeight: 700, color: DS.red, fontSize: 11 }}>-{Math.abs(daysTo(f.scadenza))}gg</span>
+              {D.fattScad.length > 0 && D.fattScad.slice(0, 3).map(f => (
+                <div key={f.id} onClick={() => setTab("contabilita")} style={{ ...ROW, gap: 12 }}
+                  onMouseEnter={hoverRow} onMouseLeave={leaveRow}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: S.md, fontWeight: 600, color: P.ink }}>{f.cliente || f.numero || "—"}</span>
                   </div>
+                  <span style={{ fontSize: S.md, fontWeight: 800, color: P.amber, fontFamily: FONT.mono }}>{fmtK(f.importo || 0)}</span>
+                  <span style={{ fontSize: S.sm, fontWeight: 700, color: P.red }}>-{Math.abs(daysTo(f.scadenza))}gg</span>
                 </div>
               ))}
             </div>
 
             {/* Produzione */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Produzione e ordini" badge={`${D.inProduzione.length} attive`} badgeColor={DS.orange} dot={DS.orange} onAction={() => setTab("produzione")} />
-              <RowItem label="In produzione" value={D.inProduzione.length} color={DS.orange} onClick={() => setTab("produzione")} />
-              <RowItem label="Attesa ordini" value={D.inOrdini.length} color={DS.amber} onClick={() => setTab("ordini")} />
-              <RowItem label="Pronte per posa" value={D.inPosa.length} color={DS.green} onClick={() => setTab("montaggi")} />
-              <RowItem label="Ordini fornitori" value={D.ordFornAttivi.length} color={DS.blue} onClick={() => setTab("ordini")} />
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.orange)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Produzione</span>
+                  <span style={BADGE(P.orange, P.orangeL)}>{D.inProd.length}</span>
+                </div>
+                <button onClick={() => setTab("produzione")} style={BTN.ghost}>Dettagli →</button>
+              </div>
+              {[
+                { l: "In produzione", v: D.inProd.length, c: P.orange, fn: () => setTab("produzione") },
+                { l: "Attesa ordini", v: D.inOrd.length, c: P.amber, fn: () => setTab("ordini") },
+                { l: "Pronte posa", v: D.inPosa.length, c: P.green, fn: () => setTab("montaggi") },
+                { l: "Ordini fornitori", v: D.ordForn.length, c: P.blue, fn: () => setTab("ordini") },
+              ].map(r => (
+                <div key={r.l} onClick={r.fn} style={{ ...ROW, justifyContent: "space-between" }}
+                  onMouseEnter={hoverRow} onMouseLeave={leaveRow}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={DOT(r.c, 6)} />
+                    <span style={{ fontSize: S.md, color: P.text }}>{r.l}</span>
+                  </div>
+                  <span style={{ fontSize: 18, fontWeight: 800, fontFamily: FONT.mono, color: r.v > 0 ? r.c : P.ghost }}>{r.v}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* ── COL 2 ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* COL 2 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
             {/* Oggi + 7gg */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Oggi e prossimi 7 giorni" dot={DS.purple} onAction={() => setTab("calendario")} actionLabel="Agenda →" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.purple)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Oggi e prossimi 7 giorni</span>
+                </div>
+                <button onClick={() => setTab("calendario")} style={BTN.ghost}>Agenda →</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
                 {[
-                  { n: D.montaggiOggi.length, l: "montaggi oggi", c: DS.purple },
-                  { n: D.taskOggi.length, l: "task oggi", c: DS.amber },
-                  { n: D.montaggi7.length, l: "montaggi 7gg", c: DS.blue },
-                  { n: D.consegne7.length, l: "consegne 7gg", c: DS.green },
+                  { n: D.montOggi.length, l: "montaggi oggi", c: P.purple },
+                  { n: D.taskOggi.length, l: "task oggi", c: P.amber },
+                  { n: D.mont7.length, l: "montaggi 7gg", c: P.blue },
+                  { n: D.cons7.length, l: "consegne 7gg", c: P.green },
                 ].map((t, i) => (
-                  <div key={t.l} style={{ textAlign: 'center', padding: '14px 8px', borderRight: i < 3 ? `1px solid ${DS.border}` : 'none' }}>
-                    <div style={{ fontSize: 26, fontWeight: 900, fontFamily: FM, color: t.c, lineHeight: 1 }}>{t.n}</div>
-                    <div style={{ fontSize: 8, color: DS.tealDark, marginTop: 4, fontWeight: 600 }}>{t.l}</div>
+                  <div key={t.l} style={{ textAlign: "center", padding: "16px 8px", borderRight: i < 3 ? `1px solid ${P.borderL}` : "none" }}>
+                    <div style={{ fontSize: 28, fontWeight: 900, fontFamily: FONT.mono, color: t.c, lineHeight: 1 }}>{t.n}</div>
+                    <div style={{ fontSize: 9, color: P.hint, marginTop: 6, fontWeight: 600, textTransform: "uppercase" }}>{t.l}</div>
                   </div>
                 ))}
               </div>
-              {D.montaggiOggi.length > 0 && D.montaggiOggi.slice(0, 4).map(m => (
-                <div key={m.id} style={{ padding: '9px 18px', borderTop: `1px solid ${DS.border}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: DS.dark }}>{m.cliente || "—"}</div>
-                  <div style={{ fontSize: 10, color: DS.tealDark, marginTop: 1 }}>{m.orario || ""}{m.indirizzo ? ` · ${m.indirizzo}` : ""}</div>
+              {D.montOggi.length > 0 && D.montOggi.slice(0, 4).map(m => (
+                <div key={m.id} style={{ padding: "9px 20px", borderTop: `1px solid ${P.borderL}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: S.md, fontWeight: 700, color: P.ink }}>{m.cliente || "—"}</span>
+                    <span style={{ fontSize: S.md, fontWeight: 700, color: P.purple, fontFamily: FONT.mono }}>{m.orario || ""}</span>
+                  </div>
+                  {m.indirizzo && <div style={{ fontSize: S.sm, color: P.hint, marginTop: 1 }}>{m.indirizzo}</div>}
                 </div>
               ))}
             </div>
 
-            {/* Commesse da sbloccare */}
-            <div style={{ ...card3d, borderColor: D.ferme.length > 0 ? DS.red + '40' : DS.border }}
-              onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Commesse da sbloccare" badge={D.ferme.length > 0 ? `${D.ferme.length} ferme` : ""} badgeColor={DS.red} dot={D.ferme.length > 0 ? DS.red : DS.green} onAction={D.ferme.length > 0 ? () => setTab("commesse") : undefined} />
+            {/* Ferme */}
+            <div style={{ ...CARD, borderColor: D.ferme.length > 0 ? P.red + '25' : P.border }} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(D.ferme.length > 0 ? P.red : P.green)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Da sbloccare</span>
+                  {D.ferme.length > 0 && <span style={BADGE(P.red, P.redL)}>{D.ferme.length}</span>}
+                </div>
+                {D.ferme.length > 0 && <button onClick={() => setTab("commesse")} style={BTN.ghost}>Tutte →</button>}
+              </div>
               {D.ferme.length === 0
-                ? <div style={{ padding: '20px 18px', fontSize: 12, color: DS.tealDark, textAlign: 'center' }}>Tutto in ordine ✓</div>
+                ? <div style={{ padding: "20px", fontSize: S.md, color: P.hint, textAlign: "center" }}>Tutto in ordine</div>
                 : D.ferme.slice(0, 6).map(c => {
                     const gg = giorniFermaCM(c);
-                    const col = gg >= 30 ? DS.red : gg >= 15 ? DS.orange : DS.amber;
+                    const col = gg >= 30 ? P.red : gg >= 15 ? P.orange : P.amber;
                     return (
                       <div key={c.id} onClick={() => { setSelectedCM(c); setTab("commesse"); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: `1px solid ${DS.border}`, cursor: 'pointer', transition: 'background 0.1s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = DS.light)}
-                        onMouseLeave={e => (e.currentTarget.style.background = DS.white)}>
-                        <div style={{ width: 34, height: 34, borderRadius: 8, background: col + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: col, flexShrink: 0 }}>{(c.cliente || "?")[0]}</div>
+                        style={{ ...ROW, gap: 12 }} onMouseEnter={hoverRow} onMouseLeave={leaveRow}>
+                        <div style={AVATAR(34, col)}>{(c.cliente || "?")[0]}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: DS.dark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.cliente} {c.cognome || ""}</div>
-                          <div style={{ fontSize: 10, color: DS.tealDark, marginTop: 1 }}>{FASE_LABEL[c.fase] || c.fase}{c.euro ? ` · ${fmtK(parseFloat(c.euro))}` : ""}</div>
+                          <div style={{ fontSize: S.md, fontWeight: 700, color: P.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.cliente} {c.cognome || ""}</div>
+                          <div style={{ fontSize: S.sm, color: P.hint }}>{FASE_LABEL[c.fase] || c.fase}{c.euro ? ` · ${fmtK(parseFloat(c.euro))}` : ""}</div>
                         </div>
-                        <div style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: FM }}>{gg}gg</div>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: col, fontFamily: FONT.mono }}>{gg}gg</span>
                       </div>
                     );
                   })
@@ -463,50 +355,51 @@ export default function DesktopDashboard() {
             </div>
 
             {/* Team */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Team — adesso" dot={DS.teal} onAction={() => setTab("team")} />
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.teal)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Team</span>
+                </div>
+                <button onClick={() => setTab("team")} style={BTN.ghost}>Gestione →</button>
+              </div>
               {(team.length > 0 ? team : [{ id: "1", nome: "Titolare", ruolo: "Titolare" }]).map((m, i) => {
-                const inCantiere = montaggiDB.some(mt => mt.operatoreId === m.id && mt.data === TODAY);
+                const inC = montaggiDB.some(mt => mt.operatoreId === m.id && mt.data === today);
                 const tc = tasks.filter(t => t.assegnatoA === m.id && !t.done).length;
                 return (
-                  <div key={m.id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: `1px solid ${DS.border}` }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: DS.teal + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: DS.teal, flexShrink: 0 }}>{(m.nome || "?")[0]}</div>
+                  <div key={m.id || i} style={{ ...ROW, gap: 12 }}>
+                    <div style={AVATAR(34, P.teal)}>{(m.nome || "?")[0]}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: DS.dark }}>{m.nome}</div>
-                      <div style={{ fontSize: 10, color: DS.tealDark, marginTop: 1 }}>{m.ruolo || "—"}</div>
+                      <div style={{ fontSize: S.md, fontWeight: 700, color: P.ink }}>{m.nome}</div>
+                      <div style={{ fontSize: S.sm, color: P.hint }}>{m.ruolo || "—"}</div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {inCantiere && <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: DS.green + '15', color: DS.green, fontWeight: 700 }}>Cantiere</span>}
-                      {tc > 0 && <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: DS.amber + '15', color: DS.amber, fontWeight: 700 }}>{tc} task</span>}
-                    </div>
+                    {inC && <span style={BADGE(P.green, P.greenL)}>Cantiere</span>}
+                    {tc > 0 && <span style={BADGE(P.amber, P.amberL)}>{tc} task</span>}
                   </div>
                 );
               })}
             </div>
 
-            {/* Pratiche fiscali */}
-            <div style={card3d} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-              <WHead title="Pratiche fiscali" dot={DS.blue} onAction={() => setTab("enea")} />
-              <RowItem label="Ristrutturazione 50%" value={D.pratiche.p50.length} color={DS.teal} onClick={() => setTab("enea")} />
-              <RowItem label="Ecobonus 65%" value={D.pratiche.p65.length} color={DS.blue} onClick={() => setTab("enea")} />
-              <RowItem label="Barriere 75%" value={D.pratiche.p75.length} color={DS.purple} onClick={() => setTab("enea")} />
-            </div>
-
-            {/* Problemi */}
-            {D.problemiAperti.length > 0 && (
-              <div style={{ ...card3d, borderColor: DS.red + '30' }} onMouseEnter={card3dHover} onMouseLeave={card3dLeave}>
-                <WHead title="Problemi aperti" badge={`${D.problemiAperti.length}`} badgeColor={DS.red} dot={DS.red} />
-                {D.problemiAperti.slice(0, 4).map((p, i) => (
-                  <div key={p.id || i} style={{ padding: '10px 18px', borderBottom: `1px solid ${DS.border}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: DS.dark }}>{p.titolo || "—"}</span>
-                      <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 6, background: p.priorita === "alta" ? DS.red + '15' : DS.amber + '15', color: p.priorita === "alta" ? DS.red : DS.amber, fontWeight: 700 }}>{p.priorita || "—"}</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: DS.tealDark, marginTop: 2 }}>{p.tipo || ""}{p.commessa ? ` · ${p.commessa}` : ""}</div>
-                  </div>
-                ))}
+            {/* Pratiche */}
+            <div style={CARD} onMouseEnter={hoverCard} onMouseLeave={leaveCard}>
+              <div style={SECTION_HEAD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={DOT(P.blue)} />
+                  <span style={{ fontSize: S.lg, fontWeight: 800, color: P.ink }}>Pratiche fiscali</span>
+                </div>
               </div>
-            )}
+              {[
+                { l: "Ristrutturazione 50%", v: D.prat.p50.length, c: P.teal },
+                { l: "Ecobonus 65%", v: D.prat.p65.length, c: P.blue },
+                { l: "Barriere 75%", v: D.prat.p75.length, c: P.purple },
+              ].map(r => (
+                <div key={r.l} onClick={() => setTab("enea")} style={{ ...ROW, justifyContent: "space-between" }}
+                  onMouseEnter={hoverRow} onMouseLeave={leaveRow}>
+                  <span style={{ fontSize: S.md, color: P.text }}>{r.l}</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, fontFamily: FONT.mono, color: r.v > 0 ? r.c : P.ghost }}>{r.v}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
