@@ -1,12 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabase';
 
 const MastroERP = dynamic(() => import('@/components/MastroERP'), { ssr: false });
 
@@ -17,18 +12,22 @@ export default function Page() {
 
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setLoading(false);
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          setLoading(false);
+          return;
+        }
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: 'cozzafa@gmail.com',
+          password: 'Waltercozzasrl12@'
+        });
+        if (data?.user) { setUser(data.user); }
+        else { setErr(error?.message || "Login fallito"); }
+      } catch (e: any) {
+        setErr(e.message || "Errore connessione");
       }
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'cozzafa@gmail.com',
-        password: 'Waltercozzasrl12@'
-      });
-      if (data?.user) { setUser(data.user); }
-      else { setErr(error?.message || "Login fallito"); }
       setLoading(false);
     })();
   }, []);
