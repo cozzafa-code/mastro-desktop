@@ -617,7 +617,8 @@ function MastroMisureInner({ user, azienda: aziendaInit, forceMobile, forceDeskt
   });
 
   // Persist + cloud sync effects
-  useEffect(() => persistAndSync(syncReady, isUuid, sync, "cantieri", cantieri), [cantieri]);
+  // DESKTOP: read-only, no overwrite Supabase
+  // useEffect(() => persistAndSync(syncReady, isUuid, sync, "cantieri", cantieri), [cantieri]);
   useVaniSync(cantieri, userId, isUuid);
   useEffect(() => persistAndSync(syncReady, isUuid, sync, "tasks", tasks), [tasks]);
   useEffect(() => persistAndSync(syncReady, isUuid, sync, "events", events), [events]);
