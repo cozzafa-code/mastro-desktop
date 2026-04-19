@@ -143,7 +143,7 @@ export default function DesktopDashboard() {
     // Top commesse per valore
     const topCM = [...attive].sort((a, b) => (parseFloat(b.euro) || 0) - (parseFloat(a.euro) || 0)).slice(0, 5);
     // Recenti
-    const recenti = [...cantieri].sort((a, b) => (b.updatedAt || b.id || "").localeCompare(a.updatedAt || a.id || "")).slice(0, 6);
+    const recenti = [...cantieri].sort((a, b) => String(b.updatedAt || b.id || "").localeCompare(String(a.updatedAt || a.id || ""))).slice(0, 6);
 
     const LIMIT7 = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
     const mont7 = montaggiDB.filter(m => m.data >= TODAY && m.data <= LIMIT7);
