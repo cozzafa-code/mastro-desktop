@@ -1,6 +1,9 @@
 'use client';
 import HomePanel from './HomePanel';
 import DesktopDashboard from './DesktopDashboard';
+import DesktopCommesse from './DesktopCommesse';
+import DesktopClienti from './DesktopClienti';
+import DesktopContabilita from './DesktopContabilita';
 import CostruttorePanel from './CostruttorePanel';
 import CommessePanel from './CommessePanel';
 import AgendaPanel from './AgendaPanel';
@@ -673,10 +676,10 @@ export default function MastroDesktop() {
     switch (activePanel) {
       case 'dashboard': return <DesktopDashboard />;
       case 'agenda': return <AgendaPanel />;
-      case 'commesse': return <CommessePanel onNavigate={navigateTo} onOpenVano={handleOpenVano} />;
+      case 'commesse': return <DesktopCommesse onNavigate={navigateTo} onOpenVano={handleOpenVano} />;
       case 'messaggi': return <MastroSignal onBack={() => navigateTo('home')} initialEntity={signalEntity} initialContatto={signalContatto} />;
-      case 'clienti': return <ClientiPanel />;
-      case 'contabilita': return <ContabilitaPanel />;
+      case 'clienti': return <DesktopClienti />;
+      case 'contabilita': return <DesktopContabilita />;
       case 'configuratore': return <CostruttorePanel onBack={() => handleBackFromVano()} vanoId={selectedVanoId} commessaId={vanoCommessaId} />;
       case 'settings': return <SettingsPanelInline onNavigate={navigateTo} />;
       case 'cnc': return <DesktopProdFlow commessaId={navCommessaId} onNavigate={navigateTo} onBack={() => navigateTo('home')} />;
