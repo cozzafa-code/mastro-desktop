@@ -165,7 +165,7 @@ export default function DesktopDashboard() {
 
   return (
     <div style={{ height: "100%", overflowY: "auto", background: C.bg, fontFamily: FF, color: C.text }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 28px 48px" }}>
+      <div style={{ padding: "16px 28px 40px" }}>
 
         {/* ═══ HEADER ═══ */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
