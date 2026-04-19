@@ -13,6 +13,7 @@ const MastroERP = dynamic(() => import('@/components/MastroERP'), { ssr: false }
 export default function Page() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -22,11 +23,12 @@ export default function Page() {
         setLoading(false);
         return;
       }
-      const { data } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: 'cozzafa@gmail.com',
-        password: 'Waltercozzasrl12@'
+        password: 'Walter1375@'
       });
-      if (data?.user) setUser(data.user);
+      if (data?.user) { setUser(data.user); }
+      else { setErr(error?.message || "Login fallito"); }
       setLoading(false);
     })();
   }, []);
@@ -44,7 +46,7 @@ export default function Page() {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0D1F1F', color: '#DC4444', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>Errore login</div>
-        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 8 }}>Verifica credenziali</div>
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 8 }}>{err}</div>
       </div>
     </div>
   );
