@@ -143,7 +143,7 @@ export default function DesktopDashboard() {
     // Top commesse per valore
     const topCM = [...attive].sort((a, b) => (parseFloat(b.euro) || 0) - (parseFloat(a.euro) || 0)).slice(0, 5);
     // Recenti
-    const recenti = [...cantieri].sort((a, b) => String(b.updatedAt || b.id || "").localeCompare(String(a.updatedAt || a.id || ""))).slice(0, 6);
+    const recenti = [...cantieri].sort((a, b) => String(b.updatedAt || b.id || "").localeCompare(String(a.updatedAt || a.id || ""))).slice(0, 12);
 
     const LIMIT7 = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
     const mont7 = montaggiDB.filter(m => m.data >= TODAY && m.data <= LIMIT7);
@@ -168,7 +168,7 @@ export default function DesktopDashboard() {
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 28px 48px" }}>
 
         {/* ═══ HEADER ═══ */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: C.ink, margin: 0 }}>Bentornato, {nome.split(' ')[0]}!</h1>
             <p style={{ fontSize: 13, color: C.sub, margin: '4px 0 0' }}>Ecco cosa succede con la tua azienda oggi — {dateStr}</p>
@@ -184,7 +184,7 @@ export default function DesktopDashboard() {
         </div>
 
         {/* ═══ KPI ROW ═══ */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 16 }}>
           {[
             { label: "Commesse attive", value: D.attive.length, trend: `${D.attive.length}`, trendLabel: "", positive: true, sub: `[+${D.conf.length} conf.]`, click: () => setTab("commesse") },
             { label: "Pipeline totale", value: fmtK(D.pipe), trend: `${pct(D.pipeConf, D.pipe)}%`, trendLabel: " conf.", positive: true, sub: `${fmtK(D.pipeConf)} confermato` },
@@ -206,7 +206,7 @@ export default function DesktopDashboard() {
         </div>
 
         {/* ═══ SUMMARY CHART + TOP COMMESSE ═══ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 14, marginBottom: 16 }}>
           {/* Chart */}
           <div style={cardStyle}>
             <div style={{ padding: '18px 22px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -266,7 +266,7 @@ export default function DesktopDashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 100px 90px 100px', padding: '10px 22px', borderTop: `1px solid ${C.borderL}`, borderBottom: `1px solid ${C.borderL}`, fontSize: 11, fontWeight: 600, color: C.hint }}>
               <span>Commessa</span><span>Cliente</span><span>Importo</span><span>Fase</span><span>Stato</span>
             </div>
-            {D.recenti.map((c, i) => {
+            {D.recenti.slice(0, 10).map((c, i) => {
               const gg = giorniFermaCM(c);
               const ferma = gg >= sogliaDays;
               return (
