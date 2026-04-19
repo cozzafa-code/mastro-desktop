@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 // @ts-nocheck
 // ═══════════════════════════════════════════════════════════
 // MASTRO ERP — useCloudLoader hook
@@ -69,7 +69,7 @@ export function useCloudLoader(
         fase: "sopralluogo", ...c,
         fase: c.fase === "misure" ? "sopralluogo" : (c.fase || "sopralluogo"),
       })) || null;
-      if (safeCantieri) { setters.setCantieri(safeCantieri); localStorage.setItem("mastro:cantieri", JSON.stringify(safeCantieri)); }
+      if (safeCantieri) { setters.setCantieri(safeCantieri); /* skip localStorage - too large */ }
 
       // Array semplici (no mapping needed)
       const arrayKeysSimple = [
@@ -215,3 +215,4 @@ export function persistAndSync(
   try { localStorage.setItem(`mastro:${key}`, JSON.stringify(state)); } catch {}
   if (syncReady.current && isUuid) sync.cloudSave(key, state);
 }
+
