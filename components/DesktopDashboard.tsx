@@ -1,431 +1,478 @@
 "use client";
-// @ts-nocheck
-// MASTRO — DesktopDashboard v4
-// Drag & drop widget, percentuali, dettaglio inline, personalizzabile
+// ═══════════════════════════════════════════════════════════════
+// MASTRO HQ — Centro di Controllo Totale
+// Phase 1: Hero + Criticità + Pipeline Live + Economia + Team
+// Design: Industrial Control Room — costoso, preciso, vivo
+// ═══════════════════════════════════════════════════════════════
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useMastro } from "./MastroContext";
-import { FF, FM, ICO, I } from "./mastro-constants";
 
-const TEAL="#1A9E73",DARK="#1A1A1C",RED="#DC4444",AMB="#D08008",PUR="#8B5CF6",BLU="#3B7FE0",ORG="#F97316";
-const fmtE=(n:number)=>"€"+Math.round(n).toLocaleString("it-IT");
-const fmtK=(n:number)=>n>=1000?"€"+Math.round(n/1000)+"k":fmtE(n);
-const daysTo=(d:string)=>Math.floor((new Date(d).getTime()-Date.now())/86400000);
-const pct=(a:number,b:number)=>b>0?Math.round(a/b*100):0;
+// ── DESIGN TOKENS ──────────────────────────────────────────────
+const C = {
+  bg: "#F2F1EC",
+  surface: "#FFFFFF",
+  raised: "#F8F7F2",
+  rim: "#E5E4DF",
+  rimLight: "#F2F1EC",
+  ink: "#1A1A1C",
+  sub: "#86868b",
+  ghost: "#C0C0C5",
+  teal: "#1A9E73",
+  amber: "#D08008",
+  red: "#DC4444",
+  blue: "#3B7FE0",
+  purple: "#8B5CF6",
+  orange: "#F97316",
+  yellow: "#F59E0B",
+};
+const FM = "'JetBrains Mono','SF Mono','Fira Code',monospace";
+const FF = "'Inter',-apple-system,BlinkMacSystemFont,sans-serif";
 
-const PIPE_ORDER=["sopralluogo","preventivo","conferma","misure","ordini","produzione","posa","chiusura"];
-const PIPE_COL:Record<string,string>={sopralluogo:BLU,preventivo:AMB,conferma:TEAL,misure:PUR,ordini:RED,produzione:ORG,posa:"#F59E0B",chiusura:TEAL};
-const PIPE_LBL:Record<string,string>={sopralluogo:"Sopralluogo",preventivo:"Preventivo",conferma:"Conferma",misure:"Misure",ordini:"Ordini",produzione:"Produzione",posa:"Posa",chiusura:"Chiusura"};
+// ── HELPERS ────────────────────────────────────────────────────
+const fmtE = (n: number) => "€" + Math.round(n).toLocaleString("it-IT");
+const fmtK = (n: number) => (n >= 1000 ? "€" + Math.round(n / 1000) + "k" : fmtE(n));
+const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+const daysTo = (d: string) => Math.floor((new Date(d).getTime() - Date.now()) / 86400000);
+const TODAY = new Date().toISOString().split("T")[0];
 
-const DEFAULT_LAYOUT = ["pipeline","scadenze","produzione","oggi","pratiche","team","problemi","ferme"];
+const FASI = ["sopralluogo", "preventivo", "conferma", "misure", "ordini", "produzione", "posa", "chiusura"] as const;
+const FASE_LABEL: Record<string, string> = { sopralluogo: "Sopralluogo", preventivo: "Preventivo", conferma: "Conferma", misure: "Misure", ordini: "Ordini", produzione: "Produzione", posa: "Posa", chiusura: "Chiusura" };
+const FASE_COLOR: Record<string, string> = { sopralluogo: C.blue, preventivo: C.amber, conferma: C.teal, misure: C.purple, ordini: C.red, produzione: C.orange, posa: C.yellow, chiusura: C.teal };
 
-function getRuoloColor(r:string){if(!r)return TEAL;if(r.includes("Montatore"))return PUR;if(r.includes("Preventiv"))return BLU;return AMB;}
+// ── MICRO COMPONENTS ───────────────────────────────────────────
 
-// ── Mini barra percentuale ────────────────────────────────────
-function Bar({value,color,max=100}:any){
+function Dot({ color, size = 8 }: { color: string; size?: number }) {
+  return <div style={{ width: size, height: size, borderRadius: "50%", background: color, flexShrink: 0 }} />;
+}
+
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
-    <div style={{height:4,borderRadius:2,background:"#F2F1EC",overflow:"hidden",marginTop:6}}>
-      <div style={{height:"100%",width:`${Math.min(pct(value,max),100)}%`,background:color,borderRadius:2,transition:"width .4s ease"}}/>
+    <div style={{ height: 3, borderRadius: 2, background: C.rimLight, overflow: "hidden", marginTop: 6 }}>
+      <div style={{ height: "100%", width: `${Math.min(pct(value, max), 100)}%`, background: color, borderRadius: 2, transition: "width .4s ease" }} />
     </div>
   );
 }
 
-// ── KPI card con percentuale ──────────────────────────────────
-function KPI({l,v,sub="",color="",alert=false,onClick=null,pctVal=null,pctOf=null,pctLabel=""}:any){
-  const p = pctVal!==null && pctOf ? pct(pctVal,pctOf) : null;
+function SectionTitle({ children, count, color }: { children: string; count?: number; color?: string }) {
   return (
-    <div onClick={onClick} style={{background:alert?color+"06":"#fff",borderRadius:14,padding:"18px 20px",border:`1px solid ${alert?color+"40":"#E5E3DC"}`,cursor:onClick?"pointer":"default",transition:"box-shadow .15s"}}
-      onMouseEnter={e=>onClick&&((e.currentTarget as any).style.boxShadow="0 4px 16px rgba(0,0,0,0.08)")}
-      onMouseLeave={e=>((e.currentTarget as any).style.boxShadow="none")}>
-      <div style={{fontSize:11,color:"#86868b",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{l}</div>
-      <div style={{fontSize:30,fontWeight:800,color:color||DARK,fontFamily:FM,lineHeight:1}}>{v}</div>
-      {sub&&<div style={{fontSize:12,color:"#86868b",marginTop:4}}>{sub}</div>}
-      {p!==null&&<>
-        <Bar value={pctVal} max={pctOf} color={color||DARK}/>
-        <div style={{fontSize:10,color:"#86868b",marginTop:3}}>{p}% {pctLabel}</div>
-      </>}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+      {color && <Dot color={color} />}
+      <span style={{ fontSize: 13, fontWeight: 800, color: C.ink, textTransform: "uppercase", letterSpacing: 0.8 }}>{children}</span>
+      {count !== undefined && <span style={{ fontSize: 11, padding: "2px 10px", borderRadius: 20, background: (color || C.ink) + "12", color: color || C.ink, fontWeight: 800 }}>{count}</span>}
     </div>
   );
 }
 
-// ── Widget drag & drop ────────────────────────────────────────
-function Widget({id,title,color="",badge="",onMore=null,hidden=false,onHide,dragging,onDragStart,onDragOver,onDrop,defaultOpen=true,children}:any){
-  const [open,setOpen]=useState(defaultOpen);
-  if(hidden) return null;
-  return (
-    <div
-      draggable
-      onDragStart={()=>onDragStart(id)}
-      onDragOver={e=>{e.preventDefault();onDragOver(id);}}
-      onDrop={()=>onDrop(id)}
-      style={{background:"#fff",borderRadius:14,border:`1px solid ${color?color+"25":"#E5E3DC"}`,overflow:"hidden",marginBottom:16,opacity:dragging===id?0.5:1,transition:"opacity .15s",cursor:"grab"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px",cursor:"pointer",userSelect:"none",gap:10}}>
-        <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
-          <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0,opacity:.3}}>
-            <div style={{display:"flex",gap:2}}>{[0,1].map(i=><div key={i} style={{width:3,height:3,borderRadius:"50%",background:DARK}}/>)}</div>
-            <div style={{display:"flex",gap:2}}>{[0,1].map(i=><div key={i} style={{width:3,height:3,borderRadius:"50%",background:DARK}}/>)}</div>
-            <div style={{display:"flex",gap:2}}>{[0,1].map(i=><div key={i} style={{width:3,height:3,borderRadius:"50%",background:DARK}}/>)}</div>
-          </div>
-          {color&&<div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>}
-          <span style={{fontSize:14,fontWeight:700,color:DARK,whiteSpace:"nowrap"}}>{title}</span>
-          {badge&&<span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:color?color+"15":"#F2F1EC",color:color||DARK,fontWeight:700,flexShrink:0}}>{badge}</span>}
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          {onMore&&<span onClick={e=>{e.stopPropagation();onMore();}} style={{fontSize:11,color:"#86868b",cursor:"pointer",padding:"2px 8px",borderRadius:6,border:"1px solid #E5E3DC",whiteSpace:"nowrap"}}>Vedi tutto →</span>}
-          <div onClick={e=>{e.stopPropagation();onHide(id);}} title="Nascondi widget" style={{width:22,height:22,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#C0C0C5",fontSize:14,lineHeight:1}}
-            onMouseEnter={e=>((e.currentTarget as any).style.background="#F2F1EC")}
-            onMouseLeave={e=>((e.currentTarget as any).style.background="transparent")}>×</div>
-          <div onClick={()=>setOpen(o=>!o)} style={{color:"#86868b",fontSize:12,cursor:"pointer",width:20,textAlign:"center"}}>{open?"▲":"▼"}</div>
-        </div>
-      </div>
-      {open&&<div style={{borderTop:"1px solid #F2F1EC"}}>{children}</div>}
-    </div>
-  );
+// ── SEMAFORO AZIENDA ───────────────────────────────────────────
+function semaforoAzienda(ferme: number, attive: number, fattScadute: number, problemi: number): { color: string; label: string; level: string } {
+  const pFerme = attive > 0 ? (ferme / attive) * 100 : 0;
+  if (pFerme > 25 || fattScadute > 3 || problemi > 5) return { color: C.red, label: "Criticità operative", level: "ROSSO" };
+  if (pFerme > 10 || fattScadute > 0 || problemi > 0) return { color: C.amber, label: "Attenzione richiesta", level: "GIALLO" };
+  return { color: C.teal, label: "Sotto controllo", level: "VERDE" };
 }
 
-// ── Riga commessa cliccabile ──────────────────────────────────
-function CMRow({c,onClick,giorniFermaCM}:any){
-  const gg=giorniFermaCM(c);
-  const col=gg>=30?RED:gg>=15?ORG:AMB;
-  return (
-    <div onClick={onClick} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px",borderBottom:"1px solid #F2F1EC",cursor:"pointer",transition:"background .1s"}}
-      onMouseEnter={e=>((e.currentTarget as any).style.background="#F8F7F2")}
-      onMouseLeave={e=>((e.currentTarget as any).style.background="transparent")}>
-      <div style={{width:36,height:36,borderRadius:10,background:col+"15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:col,flexShrink:0}}>{(c.cliente||"?")[0]}</div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:13,fontWeight:700,color:DARK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.cliente} {c.cognome||""}</div>
-        <div style={{fontSize:11,color:"#86868b",marginTop:1}}>{c.code} · {PIPE_LBL[c.fase]||c.fase}{c.euro?` · ${fmtK(parseFloat(c.euro))}`:""}</div>
-      </div>
-      <div style={{textAlign:"right",flexShrink:0}}>
-        <div style={{fontSize:13,fontWeight:800,color:col}}>{gg}gg</div>
-        <div style={{fontSize:10,color:"#86868b"}}>ferma</div>
-      </div>
-    </div>
-  );
-}
+// ═══════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════
+export default function DesktopDashboard() {
+  const {
+    cantieri = [], fattureDB = [], ordiniFornDB = [], montaggiDB = [],
+    tasks = [], msgs = [], team = [], problemi = [], aziendaInfo,
+    setTab, setSelectedCM, setFilterFase, giorniFermaCM, sogliaDays = 7,
+  } = useMastro();
 
-export default function DesktopDashboard(){
-  const {T,cantieri=[],fattureDB=[],ordiniFornDB=[],montaggiDB=[],tasks=[],msgs=[],team=[],problemi=[],aziendaInfo,setTab,setSelectedCM,setFilterFase,giorniFermaCM,sogliaDays=7}=useMastro();
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const [scadFiltro,setScadFiltro]=useState(15);
-  const [layout,setLayout]=useState<string[]>(DEFAULT_LAYOUT);
-  const [hidden,setHidden]=useState<string[]>([]);
-  const [dragging,setDragging]=useState<string|null>(null);
-  const [dragOver,setDragOver]=useState<string|null>(null);
-  const [editMode,setEditMode]=useState(false);
+  // ── COMPUTED DATA ──────────────────────────────────────────
+  const data = useMemo(() => {
+    const attive = cantieri.filter((c: any) => c.fase !== "chiusura");
+    const ferme = attive.filter((c: any) => giorniFermaCM(c) >= sogliaDays);
+    const confermati = attive.filter((c: any) => ["conferma", "misure", "ordini", "produzione", "posa"].includes(c.fase));
+    const totPipeline = attive.reduce((s: number, c: any) => s + (parseFloat(c.euro) || 0), 0);
+    const totConfermato = confermati.reduce((s: number, c: any) => s + (parseFloat(c.euro) || 0), 0);
 
-  // Salva preferenze
-  useEffect(()=>{
-    try{const s=localStorage.getItem("mastro_dash_layout");if(s){const p=JSON.parse(s);setLayout(p.layout||DEFAULT_LAYOUT);setHidden(p.hidden||[]);}}catch{}
-  },[]);
-  const save=(l:string[],h:string[])=>{try{localStorage.setItem("mastro_dash_layout",JSON.stringify({layout:l,hidden:h}));}catch{}};
+    const fattNonPagate = fattureDB.filter((f: any) => !f.pagata);
+    const daIncassare = fattNonPagate.reduce((s: number, f: any) => s + (f.importo || 0), 0);
+    const fattScadute = fattureDB.filter((f: any) => !f.pagata && f.scadenza && f.scadenza < TODAY);
+    const totScaduto = fattScadute.reduce((s: number, f: any) => s + (f.importo || 0), 0);
 
-  const hideWidget=(id:string)=>{const h=[...hidden,id];setHidden(h);save(layout,h);};
-  const showAll=()=>{setHidden([]);save(layout,[]);};
+    const problemiAperti = (problemi || []).filter((p: any) => p.stato !== "risolto");
+    const montaggiOggi = montaggiDB.filter((m: any) => m.data === TODAY);
+    const taskOggi = tasks.filter((t: any) => !t.done && t.date === TODAY);
+    const msgNonLetti = msgs.filter((m: any) => !m.letto).length;
 
-  const onDragStart=(id:string)=>setDragging(id);
-  const onDragOver=(id:string)=>setDragOver(id);
-  const onDrop=(id:string)=>{
-    if(!dragging||dragging===id)return;
-    const l=[...layout];
-    const from=l.indexOf(dragging),to=l.indexOf(id);
-    if(from<0||to<0)return;
-    l.splice(from,1);l.splice(to,0,dragging);
-    setLayout(l);save(l,hidden);setDragging(null);setDragOver(null);
-  };
+    const inProduzione = attive.filter((c: any) => c.fase === "produzione");
+    const inPosa = attive.filter((c: any) => c.fase === "posa");
+    const inOrdini = attive.filter((c: any) => c.fase === "ordini");
 
-  const TODAY=new Date().toISOString().split("T")[0];
-  const NOW=new Date();
-  const h=NOW.getHours();
-  const saluto=h<12?"Buongiorno":h<18?"Buon pomeriggio":"Buonasera";
+    // Criticità auto-generate
+    const criticita: Array<{ id: string; gravita: "alta" | "media" | "bassa"; titolo: string; dettaglio: string; modulo: string; impatto: string; azione: string; onClick?: () => void }> = [];
 
-  const attive=cantieri.filter(c=>c.fase!=="chiusura");
-  const ferme=attive.filter(c=>giorniFermaCM(c)>=sogliaDays);
-  const confermati=attive.filter(c=>["conferma","misure","ordini","produzione","posa"].includes(c.fase));
-  const totPipeline=attive.reduce((s,c)=>s+(parseFloat(c.euro)||0),0);
-  const totConfermato=confermati.reduce((s,c)=>s+(parseFloat(c.euro)||0),0);
-  const daIncassare=fattureDB.filter(f=>!f.pagata).reduce((s,f)=>s+(f.importo||0),0);
-  const fattTot=fattureDB.reduce((s,f)=>s+(f.importo||0),0);
-  const fattScad=fattureDB.filter(f=>!f.pagata&&f.scadenza&&f.scadenza<TODAY);
-  const msgNonLetti=msgs.filter(m=>!m.letto).length;
-  const problemiAperti=(problemi||[]).filter(p=>p.stato!=="risolto");
-  const montaggiOggi=montaggiDB.filter(m=>m.data===TODAY);
-  const taskOggi=tasks.filter(t=>!t.done&&t.date===TODAY);
+    ferme.sort((a: any, b: any) => giorniFermaCM(b) - giorniFermaCM(a)).slice(0, 5).forEach((c: any) => {
+      const gg = giorniFermaCM(c);
+      criticita.push({
+        id: `ferma-${c.id}`, gravita: gg >= 30 ? "alta" : "media",
+        titolo: `${c.cliente} ${c.cognome || ""} — ferma da ${gg} giorni`,
+        dettaglio: `Fase: ${FASE_LABEL[c.fase] || c.fase} · ${c.code}`,
+        modulo: "Commesse", impatto: c.euro ? `${fmtK(parseFloat(c.euro))} bloccati` : "Blocco avanzamento",
+        azione: "Apri commessa", onClick: () => { setSelectedCM(c); setTab("commesse"); },
+      });
+    });
 
-  const LIMIT=new Date(Date.now()+scadFiltro*86400000).toISOString().split("T")[0];
-  const consegne=cantieri.filter(c=>c.dataConsegna&&c.dataConsegna>=TODAY&&c.dataConsegna<=LIMIT&&c.fase!=="chiusura");
-  const fattInScad=fattureDB.filter(f=>!f.pagata&&f.scadenza&&f.scadenza>=TODAY&&f.scadenza<=LIMIT);
-  const montaggiInArr=montaggiDB.filter(m=>m.data>=TODAY&&m.data<=LIMIT);
+    fattScadute.slice(0, 3).forEach((f: any) => {
+      criticita.push({
+        id: `fatt-${f.id}`, gravita: "alta",
+        titolo: `Fattura scaduta — ${f.cliente || f.numero || "—"}`,
+        dettaglio: `Scaduta da ${Math.abs(daysTo(f.scadenza))} giorni`,
+        modulo: "Contabilità", impatto: fmtE(f.importo || 0),
+        azione: "Vai a contabilità", onClick: () => setTab("contabilita"),
+      });
+    });
 
-  const inProduzione=cantieri.filter(c=>c.fase==="produzione");
-  const inOrdini=cantieri.filter(c=>c.fase==="ordini");
-  const inPosa=cantieri.filter(c=>c.fase==="posa");
-  const pratiche={p50:cantieri.filter(c=>c.detrazione==="50"),p65:cantieri.filter(c=>c.detrazione==="65"),p75:cantieri.filter(c=>c.detrazione==="75")};
+    problemiAperti.slice(0, 3).forEach((p: any) => {
+      criticita.push({
+        id: `prob-${p.id}`, gravita: p.priorita === "alta" ? "alta" : "media",
+        titolo: p.titolo || "Problema aperto",
+        dettaglio: `${p.tipo || ""} ${p.commessa ? `· ${p.commessa}` : ""}`,
+        modulo: "Problemi", impatto: "Da risolvere",
+        azione: "Dettaglio",
+      });
+    });
 
-  const wProps=(id:string)=>({id,hidden:hidden.includes(id),onHide:hideWidget,dragging,onDragStart,onDragOver,onDrop});
+    criticita.sort((a, b) => (a.gravita === "alta" ? 0 : a.gravita === "media" ? 1 : 2) - (b.gravita === "alta" ? 0 : b.gravita === "media" ? 1 : 2));
 
-  const WIDGETS:Record<string,React.ReactNode>={
-    pipeline:(
-      <Widget {...wProps("pipeline")} title="Pipeline commesse" badge={`${attive.length} attive`} onMore={()=>setTab("commesse")}>
-        <div style={{padding:"14px 18px"}}>
-          <div style={{display:"flex",gap:3,height:18,borderRadius:6,overflow:"hidden",marginBottom:14}}>
-            {PIPE_ORDER.map(fase=>{const n=cantieri.filter(c=>c.fase===fase).length;if(!n)return null;return <div key={fase} style={{flex:n,background:PIPE_COL[fase],minWidth:n*18,transition:"flex .3s"}} title={`${PIPE_LBL[fase]}: ${n} (${pct(n,cantieri.length)}%)`}/>;  })}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-            {PIPE_ORDER.map(fase=>{
-              const items=cantieri.filter(c=>c.fase===fase);
-              const euro=items.reduce((s,c)=>s+(parseFloat(c.euro)||0),0);
-              const col=PIPE_COL[fase];
-              const p=pct(items.length,cantieri.length);
-              return (
-                <div key={fase} onClick={()=>{setFilterFase(fase);setTab("commesse");}} style={{padding:"12px 12px",borderRadius:10,background:items.length>0?col+"08":"#F8F7F2",border:`1px solid ${items.length>0?col+"30":"#E5E3DC"}`,cursor:"pointer"}}
-                  onMouseEnter={e=>((e.currentTarget as any).style.background=col+"14")}
-                  onMouseLeave={e=>((e.currentTarget as any).style.background=items.length>0?col+"08":"#F8F7F2")}>
-                  <div style={{fontSize:11,color:"#86868b",fontWeight:600,marginBottom:4}}>{PIPE_LBL[fase]}</div>
-                  <div style={{fontSize:24,fontWeight:800,color:items.length>0?col:"#86868b",fontFamily:FM,lineHeight:1}}>{items.length}</div>
-                  <div style={{fontSize:10,color:col,fontWeight:700,marginTop:4}}>{p}%</div>
-                  {euro>0&&<div style={{fontSize:10,color:"#86868b",marginTop:2}}>{fmtK(euro)}</div>}
-                  <Bar value={items.length} max={Math.max(cantieri.length,1)} color={col}/>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </Widget>
-    ),
+    // Prossimi 7gg
+    const LIMIT7 = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+    const consegne7 = cantieri.filter((c: any) => c.dataConsegna && c.dataConsegna >= TODAY && c.dataConsegna <= LIMIT7 && c.fase !== "chiusura");
+    const montaggi7 = montaggiDB.filter((m: any) => m.data >= TODAY && m.data <= LIMIT7);
 
-    scadenze:(
-      <Widget {...wProps("scadenze")} title={`Scadenze — ${scadFiltro}gg`} color={AMB}>
-        <div style={{padding:"0 18px 14px"}}>
-          {[{title:`Consegne (${consegne.length})`,items:consegne,render:(c:any)=>(
-            <div key={c.id} onClick={()=>{setSelectedCM(c);setTab("commesse");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #F2F1EC",cursor:"pointer"}}>
-              <div><div style={{fontSize:13,fontWeight:600,color:DARK}}>{c.cliente} {c.cognome||""}</div><div style={{fontSize:11,color:"#86868b"}}>{c.code}</div></div>
-              <span style={{fontSize:13,fontWeight:800,color:daysTo(c.dataConsegna)<=3?RED:AMB}}>{daysTo(c.dataConsegna)}gg</span>
-            </div>
-          ),empty:"Nessuna consegna programmata"},
-          {title:`Fatture in scadenza (${fattInScad.length})`,items:fattInScad,render:(f:any)=>(
-            <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{fontSize:13,color:DARK}}>{f.cliente||f.numero||"—"}</div>
-              <div style={{display:"flex",gap:12}}><span style={{fontSize:13,fontWeight:700,color:AMB}}>{fmtK(f.importo||0)}</span><span style={{fontSize:12,fontWeight:700,color:daysTo(f.scadenza)<=0?RED:AMB}}>{daysTo(f.scadenza)<=0?"Scaduta":`${daysTo(f.scadenza)}gg`}</span></div>
-            </div>
-          ),empty:"Nessuna fattura in scadenza"},
-          {title:`Montaggi (${montaggiInArr.length})`,items:montaggiInArr,render:(m:any)=>(
-            <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{fontSize:13,color:DARK}}>{m.cliente||m.note||"—"}</div>
-              <span style={{fontSize:12,fontWeight:700,color:PUR}}>{m.data===TODAY?"Oggi":`${daysTo(m.data)}gg`}</span>
-            </div>
-          ),empty:"Nessun montaggio programmato"},
-          ].map(sec=>(
-            <div key={sec.title}>
-              <div style={{fontSize:10,fontWeight:800,color:"#86868b",textTransform:"uppercase",letterSpacing:.8,margin:"14px 0 8px"}}>{sec.title}</div>
-              {sec.items.length===0?<div style={{fontSize:13,color:"#86868b",padding:"4px 0 8px"}}>{sec.empty}</div>:sec.items.slice(0,4).map(sec.render)}
-            </div>
-          ))}
-        </div>
-      </Widget>
-    ),
+    return {
+      attive, ferme, confermati, totPipeline, totConfermato,
+      daIncassare, fattScadute, totScaduto, fattNonPagate,
+      problemiAperti, montaggiOggi, taskOggi, msgNonLetti,
+      inProduzione, inPosa, inOrdini, criticita,
+      consegne7, montaggi7,
+    };
+  }, [cantieri, fattureDB, ordiniFornDB, montaggiDB, tasks, msgs, team, problemi, sogliaDays]);
 
-    produzione:(
-      <Widget {...wProps("produzione")} title="Produzione" color={ORG} badge={`${inProduzione.length} attive`} onMore={()=>setTab("produzione")}>
-        <div>
-          {[{l:"In produzione",n:inProduzione.length,tot:attive.length,c:ORG},{l:"In attesa ordini",n:inOrdini.length,tot:attive.length,c:AMB},{l:"Pronte per posa",n:inPosa.length,tot:attive.length,c:TEAL},{l:"Ordini fornitori",n:(ordiniFornDB||[]).filter((o:any)=>o.stato==="inviato").length,tot:10,c:BLU}].map(row=>(
-            <div key={row.l} style={{padding:"11px 18px",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <span style={{fontSize:13,color:"#86868b"}}>{row.l}</span>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:11,color:row.c,fontWeight:700}}>{pct(row.n,row.tot||1)}%</span>
-                  <span style={{fontSize:20,fontWeight:800,color:row.n>0?row.c:"#86868b",fontFamily:FM,minWidth:28,textAlign:"right"}}>{row.n}</span>
-                </div>
-              </div>
-              <Bar value={row.n} max={Math.max(row.tot,1)} color={row.c}/>
-            </div>
-          ))}
-          {inProduzione.slice(0,3).map((c:any)=>(
-            <div key={c.id} onClick={()=>{setSelectedCM(c);setTab("commesse");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid #F2F1EC",cursor:"pointer"}}
-              onMouseEnter={e=>((e.currentTarget as any).style.background="#F8F7F2")}
-              onMouseLeave={e=>((e.currentTarget as any).style.background="transparent")}>
-              <span style={{fontSize:13,color:DARK,fontWeight:600}}>{c.cliente} {c.cognome||""}</span>
-              <span style={{fontSize:11,color:ORG,fontWeight:700}}>{c.code}</span>
-            </div>
-          ))}
-        </div>
-      </Widget>
-    ),
-
-    oggi:(
-      <Widget {...wProps("oggi")} title="Oggi" color={PUR}>
-        <div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"14px 18px 10px"}}>
-            <div style={{padding:"14px",borderRadius:10,background:PUR+"08",textAlign:"center"}}>
-              <div style={{fontSize:34,fontWeight:800,color:PUR,fontFamily:FM,lineHeight:1}}>{montaggiOggi.length}</div>
-              <div style={{fontSize:11,color:"#86868b",marginTop:6}}>montaggi oggi</div>
-              {montaggiDB.length>0&&<div style={{fontSize:10,color:PUR,marginTop:4,fontWeight:700}}>{pct(montaggiOggi.length,montaggiDB.length)}% del totale</div>}
-            </div>
-            <div style={{padding:"14px",borderRadius:10,background:AMB+"08",textAlign:"center"}}>
-              <div style={{fontSize:34,fontWeight:800,color:AMB,fontFamily:FM,lineHeight:1}}>{taskOggi.length}</div>
-              <div style={{fontSize:11,color:"#86868b",marginTop:6}}>task oggi</div>
-              {tasks.length>0&&<div style={{fontSize:10,color:AMB,marginTop:4,fontWeight:700}}>{pct(taskOggi.length,tasks.length)}% del totale</div>}
-            </div>
-          </div>
-          {montaggiOggi.length===0
-            ?<div style={{fontSize:13,color:"#86868b",textAlign:"center",padding:"10px 18px 14px"}}>Nessun montaggio oggi</div>
-            :montaggiOggi.slice(0,4).map((m:any)=>(
-            <div key={m.id} style={{padding:"10px 18px",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{fontSize:13,fontWeight:600,color:DARK}}>{m.cliente||"—"}</div>
-              <div style={{fontSize:11,color:"#86868b",marginTop:2}}>{m.orario||""}{m.indirizzo?` · ${m.indirizzo}`:""}</div>
-            </div>
-          ))}
-        </div>
-      </Widget>
-    ),
-
-    pratiche:(
-      <Widget {...wProps("pratiche")} title="Pratiche fiscali" color={BLU}>
-        <div>
-          {[{l:"Ristrutturazione 50%",items:pratiche.p50,c:TEAL},{l:"Ecobonus 65%",items:pratiche.p65,c:BLU},{l:"Barriere 75%",items:pratiche.p75,c:PUR}].map(row=>(
-            <div key={row.l} style={{padding:"12px 18px",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <div>
-                  <div style={{fontSize:13,color:DARK,fontWeight:500}}>{row.l}</div>
-                  <div style={{fontSize:11,color:"#86868b",marginTop:1}}>{row.items.length} commesse · {fmtK(row.items.reduce((s,c)=>s+(parseFloat(c.euro)||0),0))}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:22,fontWeight:800,color:row.items.length>0?row.c:"#86868b",fontFamily:FM}}>{row.items.length}</div>
-                  <div style={{fontSize:10,color:row.c,fontWeight:700}}>{pct(row.items.length,attive.length)}%</div>
-                </div>
-              </div>
-              <Bar value={row.items.length} max={Math.max(attive.length,1)} color={row.c}/>
-            </div>
-          ))}
-          <div style={{padding:"12px 18px"}}>
-            <div style={{fontSize:11,color:"#86868b",marginBottom:4}}>Valore detraibile totale</div>
-            <div style={{fontSize:22,fontWeight:800,color:BLU,fontFamily:FM}}>{fmtK([...pratiche.p50,...pratiche.p65,...pratiche.p75].reduce((s,c)=>s+(parseFloat(c.euro)||0),0))}</div>
-          </div>
-        </div>
-      </Widget>
-    ),
-
-    team:(
-      <Widget {...wProps("team")} title="Team — adesso" onMore={()=>setTab("settings")}>
-        <div>
-          {(team.length>0?team:[{id:"1",nome:"Titolare",ruolo:"Titolare"}]).map((m:any,i:number)=>{
-            const inCantiere=montaggiDB.some(mt=>mt.operatoreId===m.id&&mt.data===TODAY);
-            const tc=tasks.filter(t=>t.assegnatoA===m.id&&!t.done).length;
-            const col=m.colore||getRuoloColor(m.ruolo);
-            return (
-              <div key={m.id||i} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px",borderBottom:"1px solid #F2F1EC"}}>
-                <div style={{width:38,height:38,borderRadius:10,background:col+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:col,flexShrink:0}}>{(m.nome||"?")[0]}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:DARK}}>{m.nome}</div>
-                  <div style={{fontSize:11,color:"#86868b",marginTop:2}}>{m.ruolo||"—"}</div>
-                </div>
-                <div style={{display:"flex",gap:6,flexShrink:0}}>
-                  {inCantiere&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:TEAL+"15",color:TEAL,fontWeight:700}}>Cantiere</span>}
-                  {tc>0&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:AMB+"15",color:AMB,fontWeight:700}}>{tc} task</span>}
-                  {!inCantiere&&tc===0&&<span style={{fontSize:11,color:"#86868b"}}>—</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Widget>
-    ),
-
-    problemi:(
-      <Widget {...wProps("problemi")} title="Problemi e criticità" color={problemiAperti.length>0?RED:TEAL} badge={problemiAperti.length>0?`${problemiAperti.length} aperti`:""}>
-        <div>
-          {problemiAperti.length===0
-            ?<div style={{fontSize:13,color:"#86868b",textAlign:"center",padding:"20px 18px"}}>Nessun problema aperto ✓</div>
-            :problemiAperti.slice(0,6).map((p:any,i:number)=>(
-            <div key={p.id||i} style={{padding:"11px 18px",borderBottom:"1px solid #F2F1EC"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:DARK,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.titolo||"—"}</div>
-                  <div style={{fontSize:11,color:"#86868b",marginTop:2}}>{p.tipo||""}{p.commessa?` · ${p.commessa}`:""}</div>
-                </div>
-                <span style={{fontSize:11,padding:"3px 8px",borderRadius:6,background:p.priorita==="alta"?RED+"15":p.priorita==="media"?AMB+"15":"#F2F1EC",color:p.priorita==="alta"?RED:p.priorita==="media"?AMB:"#86868b",fontWeight:700,flexShrink:0}}>{p.priorita||"—"}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Widget>
-    ),
-
-    ferme:(
-      <Widget {...wProps("ferme")} title="Commesse da sbloccare" color={ferme.length>0?RED:""} badge={ferme.length>0?`${ferme.length} ferme · ${pct(ferme.length,attive.length)}%`:""} onMore={()=>setTab("commesse")}>
-        <div>
-          {ferme.length===0
-            ?<div style={{fontSize:13,color:"#86868b",textAlign:"center",padding:"20px 18px"}}>Tutto in ordine ✓</div>
-            :ferme.slice(0,8).map((c:any)=><CMRow key={c.id} c={c} giorniFermaCM={giorniFermaCM} onClick={()=>{setSelectedCM(c);setTab("commesse");}}/>)
-          }
-          {ferme.length>0&&(
-            <div style={{padding:"10px 18px"}}>
-              <Bar value={ferme.length} max={Math.max(attive.length,1)} color={RED}/>
-              <div style={{fontSize:10,color:"#86868b",marginTop:4}}>{pct(ferme.length,attive.length)}% delle commesse attive sono ferme</div>
-            </div>
-          )}
-        </div>
-      </Widget>
-    ),
-  };
+  const semaforo = semaforoAzienda(data.ferme.length, data.attive.length, data.fattScadute.length, data.problemiAperti.length);
+  const NOW = new Date();
+  const h = NOW.getHours();
+  const saluto = h < 12 ? "Buongiorno" : h < 18 ? "Buon pomeriggio" : "Buonasera";
+  const nomeAzienda = aziendaInfo?.ragione || aziendaInfo?.nome || "MASTRO";
 
   return (
-    <div style={{height:"100%",overflowY:"auto",background:"#F2F1EC",fontFamily:FF}}>
-      <div style={{maxWidth:1400,margin:"0 auto",padding:"22px 26px"}}>
+    <div style={{ height: "100%", overflowY: "auto", background: C.bg, fontFamily: FF }}>
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "20px 28px 40px" }}>
 
-        {/* HEADER */}
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
-          <div>
-            <div style={{fontSize:24,fontWeight:800,color:DARK,letterSpacing:-.5}}>{saluto}, {aziendaInfo?.ragione||aziendaInfo?.nome||"Walter Cozza Serramenti"}</div>
-            <div style={{fontSize:13,color:"#86868b",marginTop:3}}>{NOW.toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+        {/* ═══ HERO PANEL ═══════════════════════════════════════ */}
+        <div style={{ background: C.ink, borderRadius: 16, padding: "24px 30px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+              {/* Semaforo */}
+              <div style={{ width: 12, height: 12, borderRadius: "50%", background: semaforo.color, boxShadow: `0 0 12px ${semaforo.color}80` }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: semaforo.color, textTransform: "uppercase", letterSpacing: 1 }}>{semaforo.label}</span>
+              <span style={{ fontSize: 11, color: "#ffffff50", marginLeft: 8 }}>{NOW.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</span>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#FFFFFF", letterSpacing: -0.5, lineHeight: 1.3 }}>
+              {saluto}, {nomeAzienda}
+            </div>
+            <div style={{ fontSize: 13, color: "#ffffff80", marginTop: 6, lineHeight: 1.5 }}>
+              {data.attive.length} commesse attive · {data.montaggiOggi.length} montaggi oggi · {data.ferme.length > 0 ? <span style={{ color: C.red }}>{data.ferme.length} ferme</span> : <span style={{ color: C.teal }}>nessuna ferma</span>}
+              {data.fattScadute.length > 0 && <> · <span style={{ color: C.amber }}>{fmtK(data.totScaduto)} scaduti</span></>}
+            </div>
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
-            {hidden.length>0&&<div onClick={showAll} style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",background:TEAL+"15",color:TEAL,border:`1px solid ${TEAL}30`}}>Ripristina tutti ({hidden.length})</div>}
-            <span style={{fontSize:12,color:"#86868b"}}>Scadenze:</span>
-            {[7,15,30].map(d=>(<div key={d} onClick={()=>setScadFiltro(d)} style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",background:scadFiltro===d?DARK:"#fff",color:scadFiltro===d?"#fff":"#86868b",border:`1px solid ${scadFiltro===d?DARK:"#E5E3DC"}`}}>{d}gg</div>))}
+          {/* Quick actions */}
+          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            {[
+              { label: "Criticità", color: data.criticita.length > 0 ? C.red : C.teal, count: data.criticita.length, action: () => setExpandedSection(expandedSection === "criticita" ? null : "criticita") },
+              { label: "Agenda", color: C.purple, count: data.montaggiOggi.length + data.taskOggi.length, action: () => setTab("calendario") },
+              { label: "Pipeline", color: C.blue, count: data.attive.length, action: () => setTab("commesse") },
+            ].map((btn) => (
+              <div key={btn.label} onClick={btn.action}
+                style={{ padding: "12px 20px", borderRadius: 10, background: btn.color + "20", border: `1px solid ${btn.color}40`, cursor: "pointer", textAlign: "center", minWidth: 100, transition: "transform .1s" }}
+                onMouseEnter={(e) => ((e.currentTarget as any).style.transform = "scale(1.03)")}
+                onMouseLeave={(e) => ((e.currentTarget as any).style.transform = "scale(1)")}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: btn.color, fontFamily: FM, lineHeight: 1 }}>{btn.count}</div>
+                <div style={{ fontSize: 11, color: "#ffffffCC", marginTop: 4, fontWeight: 700 }}>{btn.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* ALERT */}
-        {(ferme.length>0||fattScad.length>0||problemiAperti.length>0)&&(
-          <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
-            {ferme.length>0&&<div onClick={()=>{setFilterFase("tutte");setTab("commesse");}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderRadius:10,background:RED+"08",border:`1.5px solid ${RED}30`,cursor:"pointer"}}><div style={{width:6,height:6,borderRadius:"50%",background:RED}}/><span style={{fontSize:13,fontWeight:700,color:RED}}>{ferme.length} commesse ferme ({pct(ferme.length,attive.length)}%) — sblocca subito</span></div>}
-            {fattScad.length>0&&<div onClick={()=>setTab("contabilita")} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderRadius:10,background:AMB+"08",border:`1.5px solid ${AMB}30`,cursor:"pointer"}}><div style={{width:6,height:6,borderRadius:"50%",background:AMB}}/><span style={{fontSize:13,fontWeight:700,color:AMB}}>{fattScad.length} fatture scadute — {fmtK(fattScad.reduce((s,f)=>s+(f.importo||0),0))}</span></div>}
-            {problemiAperti.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderRadius:10,background:RED+"08",border:`1.5px solid ${RED}30`}}><div style={{width:6,height:6,borderRadius:"50%",background:RED}}/><span style={{fontSize:13,fontWeight:700,color:RED}}>{problemiAperti.length} problemi aperti</span></div>}
+        {/* ═══ ALERT STRIP ══════════════════════════════════════ */}
+        {(data.ferme.length > 0 || data.fattScadute.length > 0 || data.problemiAperti.length > 0) && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+            {data.ferme.length > 0 && (
+              <div onClick={() => setTab("commesse")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: C.red + "08", border: `1px solid ${C.red}25`, cursor: "pointer" }}>
+                <Dot color={C.red} size={6} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.red }}>{data.ferme.length} commesse ferme · {pct(data.ferme.length, data.attive.length)}% — sblocca</span>
+              </div>
+            )}
+            {data.fattScadute.length > 0 && (
+              <div onClick={() => setTab("contabilita")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: C.amber + "08", border: `1px solid ${C.amber}25`, cursor: "pointer" }}>
+                <Dot color={C.amber} size={6} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.amber }}>{data.fattScadute.length} fatture scadute · {fmtK(data.totScaduto)}</span>
+              </div>
+            )}
+            {data.problemiAperti.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: C.red + "08", border: `1px solid ${C.red}25` }}>
+                <Dot color={C.red} size={6} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.red }}>{data.problemiAperti.length} problemi aperti</span>
+              </div>
+            )}
           </div>
         )}
 
-        {/* KPI */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10,marginBottom:20}}>
-          <KPI l="Commesse attive" v={attive.length} color={TEAL} sub={`${confermati.length} confermate`} onClick={()=>setTab("commesse")} pctVal={confermati.length} pctOf={attive.length} pctLabel="confermate"/>
-          <KPI l="Commesse ferme" v={ferme.length} color={ferme.length>0?RED:TEAL} sub={`Soglia ${sogliaDays}gg`} alert={ferme.length>0} onClick={()=>setTab("commesse")} pctVal={ferme.length} pctOf={attive.length} pctLabel="del totale"/>
-          <KPI l="Pipeline" v={fmtK(totPipeline)} color={DARK} sub={`${fmtK(totConfermato)} confermato`} pctVal={totConfermato} pctOf={totPipeline} pctLabel="confermato"/>
-          <KPI l="Da incassare" v={fmtK(daIncassare)} color={daIncassare>0?AMB:TEAL} sub={`${fattScad.length} scadute`} alert={fattScad.length>0} onClick={()=>setTab("contabilita")} pctVal={daIncassare} pctOf={fattTot||1} pctLabel="da incassare"/>
-          <KPI l="Messaggi" v={msgNonLetti} color={msgNonLetti>0?BLU:TEAL} sub={`${msgs.length} totali`} onClick={()=>setTab("messaggi")} pctVal={msgNonLetti} pctOf={msgs.length||1} pctLabel="non letti"/>
-          <KPI l="Problemi" v={problemiAperti.length} color={problemiAperti.length>0?RED:TEAL} sub={problemiAperti.length>0?"Da risolvere":"Tutto ok"} alert={problemiAperti.length>0} pctVal={problemiAperti.length} pctOf={(problemi||[]).length||1} pctLabel="aperti"/>
+        {/* ═══ KPI ROW ══════════════════════════════════════════ */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10, marginBottom: 20 }}>
+          {[
+            { l: "Commesse attive", v: data.attive.length, sub: `${data.confermati.length} confermate`, color: C.teal, pV: data.confermati.length, pO: data.attive.length, pL: "confermate", click: () => setTab("commesse") },
+            { l: "Ferme", v: data.ferme.length, sub: `soglia ${sogliaDays}gg`, color: data.ferme.length > 0 ? C.red : C.teal, pV: data.ferme.length, pO: data.attive.length, pL: "del totale", alert: data.ferme.length > 0, click: () => setTab("commesse") },
+            { l: "Pipeline", v: fmtK(data.totPipeline), sub: `${fmtK(data.totConfermato)} confermato`, color: C.ink, pV: data.totConfermato, pO: data.totPipeline, pL: "confermato" },
+            { l: "Da incassare", v: fmtK(data.daIncassare), sub: `${data.fattScadute.length} scadute`, color: data.daIncassare > 0 ? C.amber : C.teal, alert: data.fattScadute.length > 0, click: () => setTab("contabilita") },
+            { l: "Messaggi", v: data.msgNonLetti, sub: `${msgs.length} totali`, color: data.msgNonLetti > 0 ? C.blue : C.teal, click: () => setTab("messaggi") },
+            { l: "Oggi", v: data.montaggiOggi.length + data.taskOggi.length, sub: `${data.montaggiOggi.length} montaggi · ${data.taskOggi.length} task`, color: C.purple, click: () => setTab("calendario") },
+          ].map((k) => (
+            <div key={k.l} onClick={k.click} style={{ background: k.alert ? k.color + "06" : C.surface, borderRadius: 12, padding: "16px 18px", border: `1px solid ${k.alert ? k.color + "30" : C.rim}`, cursor: k.click ? "pointer" : "default", transition: "box-shadow .15s" }}
+              onMouseEnter={(e) => k.click && ((e.currentTarget as any).style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)")}
+              onMouseLeave={(e) => ((e.currentTarget as any).style.boxShadow = "none")}>
+              <div style={{ fontSize: 10, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{k.l}</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: k.color, fontFamily: FM, lineHeight: 1 }}>{k.v}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>{k.sub}</div>
+              {k.pO !== undefined && <MiniBar value={k.pV!} max={Math.max(k.pO, 1)} color={k.color} />}
+              {k.pO !== undefined && <div style={{ fontSize: 9, color: C.sub, marginTop: 3 }}>{pct(k.pV!, k.pO)}% {k.pL}</div>}
+            </div>
+          ))}
         </div>
 
-        {/* WIDGETS IN ORDINE CONFIGURABILE */}
-        <div style={{display:"grid",gridTemplateColumns:"3fr 2fr",gap:16}}>
-          <div>
-            {layout.filter((_,i)=>i%2===0).map(id=>WIDGETS[id]||null)}
-          </div>
-          <div>
-            {layout.filter((_,i)=>i%2===1).map(id=>WIDGETS[id]||null)}
-          </div>
-        </div>
-
-        {hidden.length>0&&(
-          <div style={{marginTop:8,padding:"14px 18px",borderRadius:12,background:"#fff",border:"1px dashed #E5E3DC",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <span style={{fontSize:12,color:"#86868b",fontWeight:600}}>Widget nascosti:</span>
-            {hidden.map(id=>(
-              <div key={id} onClick={()=>{const h=hidden.filter(x=>x!==id);setHidden(h);save(layout,h);}} style={{padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",background:"#F2F1EC",color:"#86868b",border:"1px solid #E5E3DC"}}>
-                + {id}
+        {/* ═══ CRITICITÀ ESPANDIBILI ════════════════════════════ */}
+        {data.criticita.length > 0 && expandedSection === "criticita" && (
+          <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.red}20`, marginBottom: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+              <SectionTitle count={data.criticita.length} color={C.red}>Criticità prioritarie</SectionTitle>
+            </div>
+            {data.criticita.map((cr) => (
+              <div key={cr.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderBottom: `1px solid ${C.rimLight}`, cursor: cr.onClick ? "pointer" : "default" }}
+                onClick={cr.onClick}
+                onMouseEnter={(e) => cr.onClick && ((e.currentTarget as any).style.background = C.raised)}
+                onMouseLeave={(e) => ((e.currentTarget as any).style.background = "transparent")}>
+                <Dot color={cr.gravita === "alta" ? C.red : cr.gravita === "media" ? C.amber : C.teal} size={10} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{cr.titolo}</div>
+                  <div style={{ fontSize: 11, color: C.sub, marginTop: 2 }}>{cr.dettaglio} · {cr.modulo}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: cr.gravita === "alta" ? C.red : C.amber }}>{cr.impatto}</div>
+                </div>
+                <div style={{ padding: "4px 12px", borderRadius: 6, border: `1px solid ${C.rim}`, fontSize: 11, fontWeight: 700, color: C.sub, flexShrink: 0 }}>{cr.azione}</div>
               </div>
             ))}
           </div>
         )}
 
+        {/* ═══ MAIN GRID: 3 COLUMNS ════════════════════════════ */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, alignItems: "start" }}>
+
+          {/* ── COL 1: STATO LIVE + PIPELINE ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Pipeline Live */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle count={data.attive.length} color={C.blue}>Pipeline live</SectionTitle>
+                {/* Barra pipeline */}
+                <div style={{ display: "flex", gap: 2, height: 14, borderRadius: 4, overflow: "hidden", marginTop: 8 }}>
+                  {FASI.map((fase) => {
+                    const n = cantieri.filter((c: any) => c.fase === fase).length;
+                    if (!n) return null;
+                    return <div key={fase} style={{ flex: n, background: FASE_COLOR[fase], minWidth: 8, transition: "flex .4s" }} title={`${FASE_LABEL[fase]}: ${n}`} />;
+                  })}
+                </div>
+              </div>
+              {FASI.filter((f) => f !== "chiusura").map((fase) => {
+                const items = cantieri.filter((c: any) => c.fase === fase);
+                const euro = items.reduce((s: number, c: any) => s + (parseFloat(c.euro) || 0), 0);
+                const col = FASE_COLOR[fase];
+                return (
+                  <div key={fase} onClick={() => { setFilterFase(fase); setTab("commesse"); }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: `1px solid ${C.rimLight}`, cursor: "pointer" }}
+                    onMouseEnter={(e) => ((e.currentTarget as any).style.background = C.raised)}
+                    onMouseLeave={(e) => ((e.currentTarget as any).style.background = "transparent")}>
+                    <Dot color={col} />
+                    <span style={{ fontSize: 12, color: C.sub, flex: 1 }}>{FASE_LABEL[fase]}</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: items.length > 0 ? col : C.ghost, fontFamily: FM, minWidth: 28, textAlign: "right" }}>{items.length}</span>
+                    {euro > 0 && <span style={{ fontSize: 11, color: C.sub, minWidth: 50, textAlign: "right" }}>{fmtK(euro)}</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Produzione */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle color={C.orange}>Produzione e ordini</SectionTitle>
+              </div>
+              {[
+                { l: "In produzione", n: data.inProduzione.length, c: C.orange },
+                { l: "Attesa ordini", n: data.inOrdini.length, c: C.amber },
+                { l: "Pronte posa", n: data.inPosa.length, c: C.teal },
+                { l: "Ordini fornitori attivi", n: (ordiniFornDB || []).filter((o: any) => o.stato === "inviato").length, c: C.blue },
+              ].map((r) => (
+                <div key={r.l} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Dot color={r.c} size={6} />
+                    <span style={{ fontSize: 12, color: C.sub }}>{r.l}</span>
+                  </div>
+                  <span style={{ fontSize: 18, fontWeight: 900, color: r.n > 0 ? r.c : C.ghost, fontFamily: FM }}>{r.n}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── COL 2: ECONOMIA + CALENDARIO ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Controllo Economico */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle color={C.teal}>Controllo economico</SectionTitle>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                {[
+                  { l: "Pipeline totale", v: fmtK(data.totPipeline), c: C.ink },
+                  { l: "Confermato", v: fmtK(data.totConfermato), c: C.teal },
+                  { l: "Da incassare", v: fmtK(data.daIncassare), c: C.amber },
+                  { l: "Scaduto", v: fmtK(data.totScaduto), c: data.totScaduto > 0 ? C.red : C.teal },
+                ].map((k, i) => (
+                  <div key={k.l} style={{ padding: "14px 20px", borderBottom: i < 2 ? `1px solid ${C.rimLight}` : "none", borderRight: i % 2 === 0 ? `1px solid ${C.rimLight}` : "none" }}>
+                    <div style={{ fontSize: 10, color: C.sub, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{k.l}</div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: k.c, fontFamily: FM, lineHeight: 1 }}>{k.v}</div>
+                  </div>
+                ))}
+              </div>
+              {data.fattScadute.length > 0 && (
+                <div style={{ borderTop: `1px solid ${C.rimLight}` }}>
+                  <div style={{ padding: "10px 20px 6px", fontSize: 10, fontWeight: 700, color: C.red, textTransform: "uppercase", letterSpacing: 0.5 }}>Fatture scadute</div>
+                  {data.fattScadute.slice(0, 3).map((f: any) => (
+                    <div key={f.id} onClick={() => setTab("contabilita")} style={{ display: "flex", justifyContent: "space-between", padding: "8px 20px", borderBottom: `1px solid ${C.rimLight}`, cursor: "pointer" }}>
+                      <span style={{ fontSize: 12, color: C.ink }}>{f.cliente || f.numero || "—"}</span>
+                      <div style={{ display: "flex", gap: 12 }}>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: C.amber }}>{fmtK(f.importo || 0)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.red }}>-{Math.abs(daysTo(f.scadenza))}gg</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Mini Calendario OPS */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle color={C.purple}>Prossimi 7 giorni</SectionTitle>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                <div style={{ padding: "14px 20px", borderRight: `1px solid ${C.rimLight}`, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: C.purple, fontFamily: FM, lineHeight: 1 }}>{data.montaggi7.length}</div>
+                  <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>montaggi</div>
+                </div>
+                <div style={{ padding: "14px 20px", textAlign: "center" }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: C.amber, fontFamily: FM, lineHeight: 1 }}>{data.consegne7.length}</div>
+                  <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>consegne</div>
+                </div>
+              </div>
+              {data.montaggiOggi.length > 0 && (
+                <div style={{ borderTop: `1px solid ${C.rimLight}` }}>
+                  <div style={{ padding: "10px 20px 6px", fontSize: 10, fontWeight: 700, color: C.purple, textTransform: "uppercase", letterSpacing: 0.5 }}>Oggi</div>
+                  {data.montaggiOggi.slice(0, 4).map((m: any) => (
+                    <div key={m.id} style={{ padding: "8px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{m.cliente || "—"}</div>
+                      <div style={{ fontSize: 11, color: C.sub, marginTop: 1 }}>{m.orario || ""}{m.indirizzo ? ` · ${m.indirizzo}` : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── COL 3: COMMESSE OSSERVATE + TEAM ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Commesse da sbloccare */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${data.ferme.length > 0 ? C.red + "30" : C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle count={data.ferme.length} color={data.ferme.length > 0 ? C.red : C.teal}>Da sbloccare</SectionTitle>
+              </div>
+              {data.ferme.length === 0
+                ? <div style={{ padding: "20px", fontSize: 12, color: C.sub, textAlign: "center" }}>Tutto in ordine</div>
+                : data.ferme.slice(0, 6).map((c: any) => {
+                    const gg = giorniFermaCM(c);
+                    const col = gg >= 30 ? C.red : gg >= 15 ? C.orange : C.amber;
+                    return (
+                      <div key={c.id} onClick={() => { setSelectedCM(c); setTab("commesse"); }}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: `1px solid ${C.rimLight}`, cursor: "pointer" }}
+                        onMouseEnter={(e) => ((e.currentTarget as any).style.background = C.raised)}
+                        onMouseLeave={(e) => ((e.currentTarget as any).style.background = "transparent")}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: col + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: col, flexShrink: 0 }}>{(c.cliente || "?")[0]}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.cliente} {c.cognome || ""}</div>
+                          <div style={{ fontSize: 10, color: C.sub }}>{FASE_LABEL[c.fase] || c.fase}{c.euro ? ` · ${fmtK(parseFloat(c.euro))}` : ""}</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: col, fontFamily: FM }}>{gg}gg</div>
+                        </div>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+
+            {/* Team Command */}
+            <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.rim}`, overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                <SectionTitle color={C.blue}>Team — adesso</SectionTitle>
+              </div>
+              {(team.length > 0 ? team : [{ id: "1", nome: "Titolare", ruolo: "Titolare" }]).map((m: any, i: number) => {
+                const inCantiere = montaggiDB.some((mt: any) => mt.operatoreId === m.id && mt.data === TODAY);
+                const tc = tasks.filter((t: any) => t.assegnatoA === m.id && !t.done).length;
+                return (
+                  <div key={m.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: C.blue + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: C.blue, flexShrink: 0 }}>{(m.nome || "?")[0]}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{m.nome}</div>
+                      <div style={{ fontSize: 10, color: C.sub }}>{m.ruolo || "—"}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      {inCantiere && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: C.teal + "15", color: C.teal, fontWeight: 700 }}>Cantiere</span>}
+                      {tc > 0 && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: C.amber + "15", color: C.amber, fontWeight: 700 }}>{tc} task</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Problemi */}
+            {data.problemiAperti.length > 0 && (
+              <div style={{ background: C.surface, borderRadius: 14, border: `1px solid ${C.red}20`, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                  <SectionTitle count={data.problemiAperti.length} color={C.red}>Problemi aperti</SectionTitle>
+                </div>
+                {data.problemiAperti.slice(0, 4).map((p: any, i: number) => (
+                  <div key={p.id || i} style={{ padding: "10px 20px", borderBottom: `1px solid ${C.rimLight}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{p.titolo || "—"}</span>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: p.priorita === "alta" ? C.red + "15" : C.amber + "15", color: p.priorita === "alta" ? C.red : C.amber, fontWeight: 700 }}>{p.priorita || "—"}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: C.sub, marginTop: 2 }}>{p.tipo || ""}{p.commessa ? ` · ${p.commessa}` : ""}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );
