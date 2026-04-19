@@ -1,5 +1,6 @@
 'use client';
 import HomePanel from './HomePanel';
+import DesktopDashboard from './DesktopDashboard';
 import CostruttorePanel from './CostruttorePanel';
 import CommessePanel from './CommessePanel';
 import AgendaPanel from './AgendaPanel';
@@ -670,7 +671,7 @@ export default function MastroDesktop() {
   // Panel router
   const renderPanel = () => {
     switch (activePanel) {
-      case 'dashboard': return <HomePanel onNavigate={navigateTo} />;
+      case 'dashboard': return <DesktopDashboard />;
       case 'agenda': return <AgendaPanel />;
       case 'commesse': return <CommessePanel onNavigate={navigateTo} onOpenVano={handleOpenVano} />;
       case 'messaggi': return <MastroSignal onBack={() => navigateTo('home')} initialEntity={signalEntity} initialContatto={signalContatto} />;
