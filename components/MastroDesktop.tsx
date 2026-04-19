@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import HomePanel from './HomePanel';
 import CostruttorePanel from './CostruttorePanel';
 import CommessePanel from './CommessePanel';
@@ -35,17 +35,17 @@ import PosizionatoreLavorazioni from './PosizionatoreLavorazioni';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// ═══════════════════════════════════════════════════════════
-// MASTRO DESKTOP — fliwoX Design System
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// MASTRO DESKTOP â€” fliwoX Design System
 // Sessione 5: Sidebar riorg + Tipologie SVG + Configuratore
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fgefcigxlbrmbeqqzjmo.supabase.co"),
+  (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnZWZjaWd4bGJybWJlcXF6am1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NjQ2NjAsImV4cCI6MjA1NTU0MDY2MH0.r2cNPGpb5MMy99kEMIRSgHgBBmJU1gfjsGOEFWBYfwY")
 );
 
-// ── Design System fliwoX (immutabile) ──
+// â”€â”€ Design System fliwoX (immutabile) â”€â”€
 const DS = {
   teal: '#28A0A0',
   tealDark: '#156060',
@@ -61,7 +61,7 @@ const DS = {
   blue: '#3B7FE0',
 };
 
-// ── SVG Icons (mastro-constants style) ──
+// â”€â”€ SVG Icons (mastro-constants style) â”€â”€
 const Icons = {
   dashboard: (
     <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -236,7 +236,7 @@ const Icons = {
   ),
 };
 
-// ── Sidebar structure (riorganizzata S5) ──
+// â”€â”€ Sidebar structure (riorganizzata S5) â”€â”€
 interface SidebarItem {
   id: string;
   label: string;
@@ -322,11 +322,11 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
 
 
 
-// DashboardPanel RIMOSSA (v11) — Il router usa HomePanel per 'dashboard'
+// DashboardPanel RIMOSSA (v11) â€” Il router usa HomePanel per 'dashboard'
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PLACEHOLDER PANELS
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 function PlaceholderPanel({ title, icon }: { title: string; icon: React.ReactNode }) {
   return (
@@ -338,9 +338,9 @@ function PlaceholderPanel({ title, icon }: { title: string; icon: React.ReactNod
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// MASTRO DESKTOP — Main Layout
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// MASTRO DESKTOP â€” Main Layout
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 // Inline wrapper per SettingsPanel (evita circular import)
 function SettingsPanelInline({ onNavigate }: { onNavigate: (p: string) => void }) {
@@ -353,9 +353,9 @@ function SettingsPanelInline({ onNavigate }: { onNavigate: (p: string) => void }
   return <SP onNavigate={onNavigate} />;
 }
 
-// ═══════════════════════════════════════════════════════════
-// VANO DETAIL STANDALONE — bypassa MastroContext, carica da Supabase
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// VANO DETAIL STANDALONE â€” bypassa MastroContext, carica da Supabase
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const M = "'JetBrains Mono', monospace";
 const VANO_TABS = ['Dettagli', 'Misure', 'Wizard', 'Preventivo', 'Disegno', 'Riepilogo'];
 const TIPI_VANO = ['F1A', 'F2A', 'F1A-R', 'F2A-R', 'PF1A', 'PF2A', 'SC-1A', 'SC-2A', 'PT-1A', 'PT-2A', 'FIX', 'VAS-1A', 'PVC-F1A'];
@@ -416,7 +416,7 @@ function VanoDetailStandalone({ vanoId, commessaId, onBack, onNavigate }: {
   const lmm = mis.lCentro || mis.larghezza || 0;
   const hmm = mis.hCentro || mis.altezza || 0;
   const hasMis = lmm > 0 && hmm > 0;
-  const mq = hasMis ? ((lmm / 1000) * (hmm / 1000)).toFixed(2) : '—';
+  const mq = hasMis ? ((lmm / 1000) * (hmm / 1000)).toFixed(2) : 'â€”';
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
@@ -440,7 +440,7 @@ function VanoDetailStandalone({ vanoId, commessaId, onBack, onNavigate }: {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontFamily: M, fontWeight: 700, color: DS.teal, background: DS.light, padding: '4px 10px', borderRadius: 6, border: `1px solid ${DS.border}` }}>{vano.tipo || '—'}</span>
+          <span style={{ fontSize: 12, fontFamily: M, fontWeight: 700, color: DS.teal, background: DS.light, padding: '4px 10px', borderRadius: 6, border: `1px solid ${DS.border}` }}>{vano.tipo || 'â€”'}</span>
           {saving && <span style={{ fontSize: 11, color: DS.amber }}>Salvando...</span>}
         </div>
       </div>
@@ -468,7 +468,7 @@ function VanoDetailStandalone({ vanoId, commessaId, onBack, onNavigate }: {
   );
 }
 
-// ── Tab DETTAGLI ──
+// â”€â”€ Tab DETTAGLI â”€â”€
 function VanoTabDettagli({ vano, updateVano }: { vano: any; updateVano: (f: string, v: any) => void }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -477,7 +477,7 @@ function VanoTabDettagli({ vano, updateVano }: { vano: any; updateVano: (f: stri
         <label style={{ fontSize: 12, fontWeight: 700, color: DS.ink, marginBottom: 4, display: 'block' }}>Tipologia</label>
         <select value={vano.tipo || ''} onChange={e => updateVano('tipo', e.target.value)}
           style={{ width: '100%', padding: '9px 10px', border: `1.5px solid ${DS.border}`, borderRadius: 8, fontSize: 13, background: DS.white, outline: 'none', color: DS.ink }}>
-          <option value="">— Seleziona —</option>
+          <option value="">â€” Seleziona â€”</option>
           {TIPI_VANO.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
@@ -493,7 +493,7 @@ function VanoTabDettagli({ vano, updateVano }: { vano: any; updateVano: (f: stri
   );
 }
 
-// ── Tab MISURE ──
+// â”€â”€ Tab MISURE â”€â”€
 const MISURE_FIELDS = [
   { key: 'lCentro', label: 'Larghezza Centro', unit: 'mm' },
   { key: 'hCentro', label: 'Altezza Centro', unit: 'mm' },
@@ -517,9 +517,9 @@ function VanoTabMisure({ vano, mis, updateMisura, lmm, hmm, mq }: {
       {/* Summary */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         {[
-          { l: 'Larghezza', v: lmm ? `${lmm} mm` : '—', c: DS.teal },
-          { l: 'Altezza', v: hmm ? `${hmm} mm` : '—', c: DS.blue },
-          { l: 'Superficie', v: mq !== '—' ? `${mq} m\u00B2` : '—', c: DS.green },
+          { l: 'Larghezza', v: lmm ? `${lmm} mm` : 'â€”', c: DS.teal },
+          { l: 'Altezza', v: hmm ? `${hmm} mm` : 'â€”', c: DS.blue },
+          { l: 'Superficie', v: mq !== 'â€”' ? `${mq} m\u00B2` : 'â€”', c: DS.green },
         ].map(s => (
           <div key={s.l} style={{ flex: 1, padding: '12px 14px', background: s.c + '08', borderRadius: 10, border: `1.5px solid ${s.c}20` }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#999' }}>{s.l}</div>
@@ -544,7 +544,7 @@ function VanoTabMisure({ vano, mis, updateMisura, lmm, hmm, mq }: {
   );
 }
 
-// ── Tab ACCESSORI (placeholder) ──
+// â”€â”€ Tab ACCESSORI (placeholder) â”€â”€
 function VanoTabAccessori({ vano }: { vano: any }) {
   const acc = vano.accessori || {};
   const items = Object.keys(acc);
@@ -569,7 +569,7 @@ function VanoTabAccessori({ vano }: { vano: any }) {
   );
 }
 
-// ── Tab DISEGNO (link to configuratore) ──
+// â”€â”€ Tab DISEGNO (link to configuratore) â”€â”€
 function VanoTabDisegno({ vano, onNavigate }: { vano: any; onNavigate: (p: string) => void }) {
   return (
     <div style={{ padding: 30, textAlign: 'center' }}>
@@ -590,18 +590,18 @@ function VanoTabDisegno({ vano, onNavigate }: { vano: any; onNavigate: (p: strin
   );
 }
 
-// ── Tab RIEPILOGO ──
+// â”€â”€ Tab RIEPILOGO â”€â”€
 function VanoTabRiepilogo({ vano, commessa, lmm, hmm, mq }: { vano: any; commessa: any; lmm: number; hmm: number; mq: string }) {
   const rows = [
-    ['Nome', vano.nome || '—'],
-    ['Tipologia', vano.tipo || '—'],
-    ['Stanza', vano.stanza || '—'],
-    ['Piano', vano.piano || '—'],
-    ['Sistema', vano.sistema || '—'],
-    ['Larghezza', lmm ? `${lmm} mm` : '—'],
-    ['Altezza', hmm ? `${hmm} mm` : '—'],
-    ['Superficie', mq !== '—' ? `${mq} m\u00B2` : '—'],
-    ['Commessa', commessa?.nome_cliente || '—'],
+    ['Nome', vano.nome || 'â€”'],
+    ['Tipologia', vano.tipo || 'â€”'],
+    ['Stanza', vano.stanza || 'â€”'],
+    ['Piano', vano.piano || 'â€”'],
+    ['Sistema', vano.sistema || 'â€”'],
+    ['Larghezza', lmm ? `${lmm} mm` : 'â€”'],
+    ['Altezza', hmm ? `${hmm} mm` : 'â€”'],
+    ['Superficie', mq !== 'â€”' ? `${mq} m\u00B2` : 'â€”'],
+    ['Commessa', commessa?.nome_cliente || 'â€”'],
   ];
   return (
     <div style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${DS.border}` }}>
@@ -615,7 +615,7 @@ function VanoTabRiepilogo({ vano, commessa, lmm, hmm, mq }: { vano: any; commess
   );
 }
 
-// ── Helper: VField ──
+// â”€â”€ Helper: VField â”€â”€
 function VField({ label, value, onChange, span }: { label: string; value: string; onChange: (v: string) => void; span?: boolean }) {
   return (
     <div style={{ gridColumn: span ? '1 / -1' : undefined }}>
@@ -629,10 +629,10 @@ function VField({ label, value, onChange, span }: { label: string; value: string
 export default function MastroDesktop() {
   const [activePanel, setActivePanel] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // ── Vano Detail bridge ──
+  // â”€â”€ Vano Detail bridge â”€â”€
   const [selectedVanoId, setSelectedVanoId] = useState<string | null>(null);
   const [vanoCommessaId, setVanoCommessaId] = useState<string | null>(null);
-  // ── Cross-navigation context ──
+  // â”€â”€ Cross-navigation context â”€â”€
   const [navCommessaId, setNavCommessaId] = useState<string | null>(null);
   const [signalEntity, setSignalEntity] = useState<string | null>(null);
   const [signalContatto, setSignalContatto] = useState<string | null>(null);
@@ -712,7 +712,7 @@ export default function MastroDesktop() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
-      {/* ── SIDEBAR ── */}
+      {/* â”€â”€ SIDEBAR â”€â”€ */}
       <aside style={{
         width: sidebarW,
         minWidth: sidebarW,
@@ -727,7 +727,7 @@ export default function MastroDesktop() {
         {/* Logo fliwoX + Toggle */}
         <div style={{ padding: '18px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => sidebarCollapsed && setSidebarCollapsed(false)}>
-            {/* fliwoX icon — exact brand SVG */}
+            {/* fliwoX icon â€” exact brand SVG */}
             <svg width="34" height="34" viewBox="0 0 200 200" fill="none">
               <g transform="rotate(8 100 100)">
                 <rect x="55" y="55" width="90" height="90" rx="22" fill="#2FA7A2"/>
@@ -861,7 +861,7 @@ export default function MastroDesktop() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* â”€â”€ MAIN CONTENT â”€â”€ */}
       <main style={{
         flex: 1,
         display: 'flex',
@@ -905,7 +905,7 @@ export default function MastroDesktop() {
           </div>
         </header>
 
-        {/* Content area — full width, no padding (panels handle their own) */}
+        {/* Content area â€” full width, no padding (panels handle their own) */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           {renderPanel()}
         </div>
@@ -913,3 +913,4 @@ export default function MastroDesktop() {
     </div>
   );
 }
+
