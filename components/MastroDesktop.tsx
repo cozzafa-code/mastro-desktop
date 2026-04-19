@@ -41,7 +41,9 @@ import { createClient } from '@supabase/supabase-js';
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const supabase = createClient(
-  (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fgefcigxlbrmbeqqzjmo.supabase.co";
+  "https://fgefcigxlbrmbeqqzjmo.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnZWZjaWd4bGJybWJlcXF6am1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NjQ2NjAsImV4cCI6MjA1NTU0MDY2MH0.r2cNPGpb5MMy99kEMIRSgHgBBmJU1gfjsGOEFWBYfwY"
+);
 
 // â”€â”€ Design System fliwoX (immutabile) â”€â”€
 const DS = {
